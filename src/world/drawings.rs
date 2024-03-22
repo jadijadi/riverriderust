@@ -24,13 +24,14 @@ impl World {
         self.canvas.clear_all();
 
         // draw the map
-        for l in 0..self.map.len() {
-            let map_c = self.map[l].1;
-            let maxc = self.maxc;
-            self.canvas
-                .draw_line((0, l as u16), "+".repeat(self.map[l].0 as usize))
-                .draw_line((map_c, l as u16), "+".repeat((maxc - map_c) as usize));
-        }
+        self.canvas.draw(&self.map);
+        // for l in 0..self.map.len() {
+        //     let map_c = self.map[l].1;
+        //     let maxc = self.maxc;
+        //     self.canvas
+        //         .draw_line((0, l as u16), "+".repeat(self.map[l].0 as usize))
+        //         .draw_line((map_c, l as u16), "+".repeat((maxc - map_c) as usize));
+        // }
 
         let gas_present = self.player.gas / 100;
         let enemies_count = self.enemies.len();

@@ -1,16 +1,15 @@
 use crate::World;
 
 use rand::Rng;
-use std::num::Wrapping;
 
 use crate::entities::{DeathCause, Enemy, EntityStatus, Fuel, PlayerStatus};
 
 impl World {
     /// check if player hit the ground
     fn check_player_status(&mut self) {
-        if self.player.location.c < self.map[self.player.location.l as usize].0
-            || self.player.location.c >= self.map[self.player.location.l as usize].1
-        {
+        let player_line = self.player.location.l as usize;
+        let (left_border, right_border) = self.map.river_borders_index(player_line);
+        if self.player.location.c < left_border || self.player.location.c >= right_border {
             self.player.status = PlayerStatus::Dead(DeathCause::Ground);
         }
 
@@ -47,44 +46,45 @@ impl World {
 
     /// Update the map
     fn update_map(&mut self) {
-        use std::cmp::Ordering::*;
+        self.map.update(&mut self.rng)
+        // use std::cmp::Ordering::*;
 
-        // move the map downward using VecDeque
-        self.map.pop_back();
-        let (mut left, mut right) = self.map[0];
-        match self.next_left.cmp(&left) {
-            Greater => left += 1,
-            Less => left -= 1,
-            Equal => {}
-        };
+        // // move the map downward using VecDeque
+        // self.map.pop_back();
+        // let (mut left, mut right) = self.map[0];
+        // match self.next_left.cmp(&left) {
+        //     Greater => left += 1,
+        //     Less => left -= 1,
+        //     Equal => {}
+        // };
 
-        match self.next_right.cmp(&right) {
-            Greater => right += 1,
-            Less => right -= 1,
-            Equal => {}
-        };
+        // match self.next_right.cmp(&right) {
+        //     Greater => right += 1,
+        //     Less => right -= 1,
+        //     Equal => {}
+        // };
 
-        if self.next_left == self.map[0].0 && self.rng.gen_range(0..10) >= 7 {
-            self.next_left = self
-                .rng
-                .gen_range(self.next_left.saturating_sub(5)..self.next_left + 5);
-            if self.next_left == 0 {
-                self.next_left = 1;
-            }
-        }
+        // if self.next_left == self.map[0].0 && self.rng.gen_range(0..10) >= 7 {
+        //     self.next_left = self
+        //         .rng
+        //         .gen_range(self.next_left.saturating_sub(5)..self.next_left + 5);
+        //     if self.next_left == 0 {
+        //         self.next_left = 1;
+        //     }
+        // }
 
-        if self.next_right == self.map[0].1 && self.rng.gen_range(0..10) >= 7 {
-            self.next_right = self.rng.gen_range(self.next_right - 5..self.next_right + 5);
-            if self.next_right > self.maxc {
-                self.next_right = Wrapping(self.maxc).0 - 1;
-            }
-        }
+        // if self.next_right == self.map[0].1 && self.rng.gen_range(0..10) >= 7 {
+        //     self.next_right = self.rng.gen_range(self.next_right - 5..self.next_right + 5);
+        //     if self.next_right > self.maxc {
+        //         self.next_right = Wrapping(self.maxc).0 - 1;
+        //     }
+        // }
 
-        if self.next_right.abs_diff(self.next_left) < 3 {
-            self.next_right += 3;
-        }
+        // if self.next_right.abs_diff(self.next_left) < 3 {
+        //     self.next_right += 3;
+        // }
 
-        self.map.push_front((left, right))
+        // self.map.push_front((left, right))
     }
 
     /// Move enemies on the river
@@ -105,10 +105,10 @@ impl World {
                 self.bullets[index].location.l -= 2;
                 self.bullets[index].energy -= 1;
 
-                if self.bullets[index].location.c
-                    < self.map[self.bullets[index].location.l as usize].0
-                    || self.bullets[index].location.c
-                        >= self.map[self.bullets[index].location.l as usize].1
+                let bullet_line = self.bullets[index].location.l as usize;
+                let (left_border, right_border) = self.map.river_borders_index(bullet_line);
+                if self.bullets[index].location.c < left_border
+                    || self.bullets[index].location.c >= right_border
                 {
                     self.bullets.remove(index);
                 }
@@ -146,9 +146,10 @@ impl World {
     /// Create a new fuel; maybe
     fn create_fuel(&mut self) {
         // Possibility
+        let (left_border, right_border) = self.map.river_borders_index(0);
         if self.rng.gen_range(0..100) >= 99 {
             self.fuels.push(Fuel::new(
-                self.rng.gen_range(self.map[0].0..self.map[0].1),
+                self.rng.gen_range(left_border..right_border),
                 0,
                 EntityStatus::Alive,
             ));
@@ -158,9 +159,10 @@ impl World {
     /// Create a new enemy
     fn create_enemy(&mut self) {
         // Possibility
+        let (left_border, right_border) = self.map.river_borders_index(0);
         if self.rng.gen_range(0..10) >= 9 {
             self.enemies.push(Enemy::new(
-                self.rng.gen_range(self.map[0].0..self.map[0].1),
+                self.rng.gen_range(left_border..right_border),
                 0,
                 EntityStatus::Alive,
             ));

@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, io::Stdout, thread, time::Duration};
+use std::{io::Stdout, thread, time::Duration};
 
 use rand::{rngs::ThreadRng, thread_rng};
 
@@ -8,7 +8,10 @@ use crate::{
     handle_pressed_keys,
 };
 
+use self::map::Map;
+
 mod drawings;
+mod map;
 mod physics;
 
 pub enum WorldStatus {
@@ -20,7 +23,7 @@ pub struct World {
     canvas: Canvas,
     pub status: WorldStatus,
     pub player: Player,
-    pub map: VecDeque<(u16, u16)>,
+    pub map: Map,
     pub maxc: u16,
     pub maxl: u16,
     pub next_right: u16,
@@ -33,6 +36,7 @@ pub struct World {
 
 impl World {
     pub fn new(maxc: u16, maxl: u16) -> World {
+        let mut rng = thread_rng();
         World {
             status: WorldStatus::Fluent,
             canvas: Canvas::new(maxc, maxl),
@@ -42,7 +46,7 @@ impl World {
                 score: 0,
                 gas: 1700,
             },
-            map: VecDeque::from(vec![(maxc / 2 - 5, maxc / 2 + 5); maxl as usize]),
+            map: Map::new(maxc, maxl, 5, maxc / 3, 1, &mut rng),
             maxc,
             maxl,
             next_left: maxc / 2 - 7,
