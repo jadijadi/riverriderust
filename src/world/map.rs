@@ -1,9 +1,10 @@
-use std::collections::VecDeque;
+use std::{cmp::Ordering, collections::VecDeque};
 
 use rand::{rngs::ThreadRng, Rng};
 
 use crate::drawable::Drawable;
 
+#[derive(Clone)]
 pub struct RiverPart {
     width: u16,
     center_c: u16,
@@ -23,6 +24,7 @@ pub struct Map {
     river_parts: VecDeque<RiverPart>,
     next_point: u16,
     change_rate: u16,
+    max_center_diff: u16,
     target_river: RiverPart,
 }
 
@@ -48,7 +50,7 @@ impl Map {
         min_width: u16,
         max_width: u16,
         change_rate: u16,
-        rng: &mut ThreadRng,
+        max_center_diff: u16,
     ) -> Self {
         Self {
             max_c,
@@ -60,7 +62,8 @@ impl Map {
                 .map(|_| RiverPart::new(max_width, max_c / 2))
                 .collect(),
             change_rate,
-            target_river: Self::generate_new_target(rng, min_width, max_width, max_c),
+            max_center_diff,
+            target_river: RiverPart::new(max_width, max_c / 2),
         }
     }
 
@@ -68,31 +71,33 @@ impl Map {
         if let Some(river) = self.front() {
             let (current_center_c, current_width) = (river.center_c, river.width);
 
-            let new_center_c = match current_center_c.cmp(&self.target_river.center_c) {
-                std::cmp::Ordering::Less => current_center_c + 1,
-                std::cmp::Ordering::Equal => current_center_c,
-                std::cmp::Ordering::Greater => current_center_c - 1,
-            };
+            let new_center_c = (current_center_c as f32)
+                + (self.target_river.center_c as f32 - current_center_c as f32) * 0.1;
+            let new_width = (current_width as f32)
+                + (self.target_river.width as f32 - current_width as f32) * 0.1;
 
-            let new_width = match current_width.cmp(&self.target_river.width) {
-                std::cmp::Ordering::Less => current_width + 1,
-                std::cmp::Ordering::Equal => current_width,
-                std::cmp::Ordering::Greater => current_width - 1,
-            };
-
-            RiverPart::new(new_width, new_center_c)
+            RiverPart::new(new_width as u16, new_center_c as u16)
         } else {
             unreachable!("Map can't get empty.")
         }
     }
 
-    fn generate_new_target(
-        rng: &mut ThreadRng,
-        min_width: u16,
-        max_width: u16,
-        max_c: u16,
-    ) -> RiverPart {
-        RiverPart::new(rng.gen_range(min_width..max_width), rng.gen_range(0..max_c))
+    fn generate_new_target(&self, rng: &mut ThreadRng) -> RiverPart {
+        let mut river = RiverPart::new(
+            rng.gen_range(self.min_width..self.max_width),
+            rng.gen_range(0..self.max_c),
+        );
+
+        let front_center_c = self.front().unwrap().center_c;
+        if river.center_c.abs_diff(front_center_c) > self.max_center_diff {
+            river.center_c = match river.center_c.cmp(&front_center_c) {
+                Ordering::Less => front_center_c - self.max_center_diff,
+                Ordering::Greater => front_center_c + self.max_center_diff,
+                _ => unreachable!(),
+            }
+        }
+
+        river
     }
 
     pub fn river_borders_index(&self, line: usize) -> (u16, u16) {
@@ -116,8 +121,7 @@ impl Map {
 
     pub fn update(&mut self, rng: &mut ThreadRng) {
         if self.next_point <= self.change_rate {
-            self.target_river =
-                Self::generate_new_target(rng, self.min_width, self.max_width, self.max_c);
+            self.target_river = self.generate_new_target(rng);
             self.next_point = self.max_l;
         }
 

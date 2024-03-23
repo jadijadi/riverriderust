@@ -36,7 +36,6 @@ pub struct World {
 
 impl World {
     pub fn new(maxc: u16, maxl: u16) -> World {
-        let mut rng = thread_rng();
         World {
             status: WorldStatus::Fluent,
             canvas: Canvas::new(maxc, maxl),
@@ -46,7 +45,7 @@ impl World {
                 score: 0,
                 gas: 1700,
             },
-            map: Map::new(maxc, maxl, 5, maxc / 3, 1, &mut rng),
+            map: Map::new(maxc, maxl, 5, maxc / 3, 2, 5),
             maxc,
             maxl,
             next_left: maxc / 2 - 7,

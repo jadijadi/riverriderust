@@ -25,7 +25,7 @@ fn main() -> std::io::Result<()> {
     enable_raw_mode()?;
 
     // init the world
-    let slowness = 60;
+    let slowness = 75;
     let mut world = World::new(maxc, maxl);
 
     // show welcoming banner
