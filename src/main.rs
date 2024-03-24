@@ -6,6 +6,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, size},
     ExecutableCommand,
 };
+use world::World;
 
 mod canvas;
 mod drawable;
@@ -13,9 +14,6 @@ mod entities;
 mod events;
 mod stout_ext;
 mod world;
-
-use events::*;
-use world::*;
 
 fn main() -> std::io::Result<()> {
     // init the screen
@@ -27,6 +25,9 @@ fn main() -> std::io::Result<()> {
     // init the world
     let slowness = 75;
     let mut world = World::new(maxc, maxl);
+
+    // Events that are running forever once in each loop
+    world.setup_event_handlers();
 
     // show welcoming banner
     world.welcome_screen(&mut sc)?;

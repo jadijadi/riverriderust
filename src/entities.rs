@@ -29,6 +29,22 @@ impl Location {
         Location { c, l }
     }
 
+    pub fn up(&self) -> Self {
+        Location::new(self.c, self.l.checked_sub(1).unwrap_or(0))
+    }
+
+    pub fn down(&self) -> Self {
+        Location::new(self.c, self.l + 1)
+    }
+
+    pub fn left(&self) -> Self {
+        Location::new(self.c.checked_sub(1).unwrap_or(0), self.l)
+    }
+
+    pub fn right(&self) -> Self {
+        Location::new(self.c + 1, self.l)
+    }
+
     // Checks if two locations are within a specified margin of each other
     pub fn hit_with_margin(
         &self,
@@ -97,4 +113,25 @@ pub struct Player {
     pub status: PlayerStatus,
     pub gas: u16,
     pub score: u16,
+    pub traveled: u16,
+}
+
+impl Player {
+    pub fn go_up(&mut self) {
+        self.traveled += 1;
+        self.location = self.location.up()
+    }
+
+    pub fn go_down(&mut self) {
+        self.traveled -= 1;
+        self.location = self.location.down()
+    }
+
+    pub fn go_left(&mut self) {
+        self.location = self.location.left()
+    }
+
+    pub fn go_right(&mut self) {
+        self.location = self.location.right()
+    }
 }

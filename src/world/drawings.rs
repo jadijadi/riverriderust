@@ -1,4 +1,5 @@
 use std::{
+    borrow::Borrow,
     io::{Stdout, Write},
     thread,
     time::Duration,
@@ -7,12 +8,56 @@ use std::{
 use crossterm::event::{poll, read};
 
 use crate::{
+    drawable::Drawable,
     entities::{DeathCause, PlayerStatus},
     stout_ext::StdoutExt,
     World,
 };
 
+pub struct NotificationDrawing {
+    max_c: u16,
+    max_l: u16,
+    message: String,
+}
+
+impl NotificationDrawing {
+    pub fn new(max_c: u16, max_l: u16, message: String) -> Self {
+        Self {
+            max_c,
+            max_l,
+            message,
+        }
+    }
+}
+
+impl Drawable for NotificationDrawing {
+    fn draw(&self, sc: &mut crate::canvas::Canvas) {
+        let message_len = self.message.len();
+        let line_1 = format!("╔═{}═╗", "═".repeat(message_len));
+        let line_2 = format!("║ {} ║", self.message);
+        let line_3 = format!("╚═{}═╝", "═".repeat(message_len));
+
+        let message_len_offset = (message_len / 2) as u16 + 2;
+        sc.draw_line(
+            (self.max_c / 2 - message_len_offset, self.max_l / 2 - 1),
+            line_1,
+        )
+        .draw_line(
+            (self.max_c / 2 - message_len_offset, self.max_l / 2),
+            line_2,
+        )
+        .draw_line(
+            (self.max_c / 2 - message_len_offset, self.max_l / 2 + 1),
+            line_3,
+        );
+    }
+}
+
 impl World {
+    pub fn notification(&self, message: impl Into<String>) -> NotificationDrawing {
+        NotificationDrawing::new(self.maxc, self.maxl, message.into())
+    }
+
     pub fn clear_screen<'a>(
         &'a self,
         stdout: &'a mut Stdout,
@@ -25,20 +70,17 @@ impl World {
 
         // draw the map
         self.canvas.draw(&self.map);
-        // for l in 0..self.map.len() {
-        //     let map_c = self.map[l].1;
-        //     let maxc = self.maxc;
-        //     self.canvas
-        //         .draw_line((0, l as u16), "+".repeat(self.map[l].0 as usize))
-        //         .draw_line((map_c, l as u16), "+".repeat((maxc - map_c) as usize));
-        // }
 
-        let gas_present = self.player.gas / 100;
-        let enemies_count = self.enemies.len();
         self.canvas
             .draw_line(2, format!(" Score: {} ", self.player.score))
-            .draw_line((2, 3), format!(" Fuel: {} ", gas_present))
-            .draw_line((2, 4), format!(" Enemies: {} ", enemies_count));
+            .draw_line((2, 3), format!(" Fuel: {} ", self.player.gas / 100))
+            .draw_line((2, 4), format!(" Enemies: {} ", self.enemies.len()))
+            .draw_line((2, 5), format!(" Traveled: {} ", self.player.traveled))
+            .draw_line((2, 6), format!(" (dbg) Events: {} ", self.events.len()))
+            .draw_line(
+                (2, 7),
+                format!(" (dbg) Timers: {} ", self.timers.borrow().len()),
+            );
 
         // draw fuel
         for fuel in self.fuels.iter() {
@@ -57,17 +99,15 @@ impl World {
 
         // draw the player
         self.canvas.draw(&self.player);
+
+        for (_, drawing) in self.custom_drawings.iter() {
+            let drawing: &dyn Drawable = drawing.borrow();
+            drawing.draw(&mut self.canvas);
+        }
     }
 
     pub(super) fn pause_screen(&mut self) {
-        let pause_msg1: &str = "╔═══════════╗";
-        let pause_msg2: &str = "║Game Paused║";
-        let pause_msg3: &str = "╚═══════════╝";
-
-        self.canvas
-            .draw_line((self.maxc / 2 - 6, self.maxl / 2 - 1), pause_msg1)
-            .draw_line((self.maxc / 2 - 6, self.maxl / 2), pause_msg2)
-            .draw_line((self.maxc / 2 - 6, self.maxl / 2 + 1), pause_msg3);
+        self.canvas.draw(&self.notification("Game Paused!"));
     }
 
     pub fn welcome_screen(&self, stdout: &mut Stdout) -> Result<(), std::io::Error> {

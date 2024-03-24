@@ -14,31 +14,102 @@ impl RiverPart {
     pub fn new(width: u16, center_c: u16) -> Self {
         Self { width, center_c }
     }
+
+    pub fn from_map(map: &Map, rng: &mut ThreadRng) -> Self {
+        use Ordering::*;
+
+        match map.river_mode {
+            RiverMode::Random {
+                min_width,
+                max_width,
+                max_center_diff,
+            } => {
+                let mut river = RiverPart::new(
+                    rng.gen_range(min_width..max_width),
+                    rng.gen_range(0..map.max_c),
+                );
+
+                // Adjust newly generated center_c to be not so far
+                let front_center_c = map.front().unwrap().center_c;
+                if river.center_c.abs_diff(front_center_c) > max_center_diff {
+                    river.center_c = match river.center_c.cmp(&front_center_c) {
+                        Less => front_center_c - max_center_diff,
+                        Greater => front_center_c + max_center_diff,
+                        _ => unreachable!(),
+                    }
+                }
+
+                river
+            }
+            RiverMode::ConstWidth {
+                width,
+                max_center_diff,
+            } => {
+                let mut river = RiverPart::new(width, rng.gen_range(0..map.max_c));
+
+                // Adjust newly generated center_c to be not so far
+                let front_center_c = map.front().unwrap().center_c;
+                if river.center_c.abs_diff(front_center_c) > max_center_diff {
+                    river.center_c = match river.center_c.cmp(&front_center_c) {
+                        Less => front_center_c - max_center_diff,
+                        Greater => front_center_c + max_center_diff,
+                        _ => unreachable!(),
+                    }
+                }
+
+                river
+            }
+            RiverMode::ConstCenter {
+                center_c,
+                min_width,
+                max_width,
+            } => RiverPart::new(rng.gen_range(min_width..max_width), center_c),
+            RiverMode::ConstWidthAndCenter { width, center_c } => RiverPart::new(width, center_c),
+        }
+    }
+}
+
+#[allow(dead_code)]
+pub enum RiverMode {
+    Random {
+        min_width: u16,
+        max_width: u16,
+        max_center_diff: u16,
+    },
+    ConstWidth {
+        width: u16,
+        max_center_diff: u16,
+    },
+    ConstCenter {
+        center_c: u16,
+        min_width: u16,
+        max_width: u16,
+    },
+    ConstWidthAndCenter {
+        width: u16,
+        center_c: u16,
+    },
 }
 
 pub struct Map {
     max_c: u16,
     max_l: u16,
-    min_width: u16,
-    max_width: u16,
+    river_mode: RiverMode,
     river_parts: VecDeque<RiverPart>,
     next_point: u16,
     change_rate: u16,
-    max_center_diff: u16,
     target_river: RiverPart,
 }
 
 impl Drawable for Map {
     fn draw(&self, sc: &mut crate::canvas::Canvas) {
         for (line, part) in self.river_parts.iter().enumerate() {
-            let (left_border, right_border) = self.river_borders(part);
+            let border_range = self.river_borders(part);
+            let (left_b, right_b) = (border_range.start, border_range.end);
 
             let line: u16 = line as u16;
-            sc.draw_line((0, line), "+".repeat(left_border.into()))
-                .draw_line(
-                    (right_border, line),
-                    "+".repeat((self.max_c - right_border) as usize),
-                );
+            sc.draw_line((0, line), "+".repeat(left_b.into()))
+                .draw_line((right_b, line), "+".repeat((self.max_c - right_b) as usize));
         }
     }
 }
@@ -55,14 +126,16 @@ impl Map {
         Self {
             max_c,
             max_l,
-            min_width,
-            max_width,
             next_point: max_l,
             river_parts: (0..max_l)
                 .map(|_| RiverPart::new(max_width, max_c / 2))
                 .collect(),
             change_rate,
-            max_center_diff,
+            river_mode: RiverMode::Random {
+                min_width,
+                max_width,
+                max_center_diff,
+            },
             target_river: RiverPart::new(max_width, max_c / 2),
         }
     }
@@ -83,40 +156,23 @@ impl Map {
     }
 
     fn generate_new_target(&self, rng: &mut ThreadRng) -> RiverPart {
-        let mut river = RiverPart::new(
-            rng.gen_range(self.min_width..self.max_width),
-            rng.gen_range(0..self.max_c),
-        );
-
-        let front_center_c = self.front().unwrap().center_c;
-        if river.center_c.abs_diff(front_center_c) > self.max_center_diff {
-            river.center_c = match river.center_c.cmp(&front_center_c) {
-                Ordering::Less => front_center_c - self.max_center_diff,
-                Ordering::Greater => front_center_c + self.max_center_diff,
-                _ => unreachable!(),
-            }
-        }
-
-        river
+        RiverPart::from_map(self, rng)
     }
 
-    pub fn river_borders_index(&self, line: usize) -> (u16, u16) {
+    pub fn river_borders_index(&self, line: usize) -> std::ops::Range<u16> {
         self.river_borders(&self.river_parts[line])
     }
 
-    pub fn river_borders(&self, river: &RiverPart) -> (u16, u16) {
+    pub fn river_borders(&self, river: &RiverPart) -> std::ops::Range<u16> {
         let offset = river.width / 2;
         let left_border = river.center_c.checked_sub(offset).unwrap_or(0);
         let right_border = river.center_c + offset;
 
-        (
-            left_border,
-            if right_border >= self.max_c {
-                self.max_c
-            } else {
-                right_border
-            },
-        )
+        left_border..if right_border >= self.max_c {
+            self.max_c
+        } else {
+            right_border
+        }
     }
 
     pub fn update(&mut self, rng: &mut ThreadRng) {
@@ -125,10 +181,13 @@ impl Map {
             self.next_point = self.max_l;
         }
 
-        let next = self.decide_next();
         self.river_parts.pop_back();
-        self.river_parts.push_front(next);
+        self.river_parts.push_front(self.decide_next());
         self.next_point = self.next_point.checked_sub(self.change_rate).unwrap_or(0);
+    }
+
+    pub fn change_river_mode(&mut self, mode: RiverMode) {
+        self.river_mode = mode;
     }
 
     pub fn front(&self) -> Option<&RiverPart> {
