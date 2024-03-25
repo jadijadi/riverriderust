@@ -232,37 +232,28 @@ impl<'g> Game<'g> {
                     center_c: world.maxc / 2,
                 });
 
-                world.add_drawing("warmup", world.notification("Warmup"));
-            },
-        ));
+                world.temp_popup("Warmup", Duration::from_secs(10), |world| {
+                    world.temp_popup("Ready !!", Duration::from_secs(2), |world| {
+                        world.temp_popup("!!! GO !!!", Duration::from_secs(1), |world| {
+                            world.map.change_river_mode(RiverMode::Random {
+                                min_width: 5,
+                                max_width: world.maxc / 3,
+                                max_center_diff: 5,
+                            });
 
-        self.add_timer(
-            "warmup",
-            WorldTimer::new(Duration::from_secs(10), false),
-            |world| {
-                world.clear_drawing("warmup");
-                world.map.change_river_mode(RiverMode::Random {
-                    min_width: 5,
-                    max_width: world.maxc / 3,
-                    max_center_diff: 5,
+                            world.fuel_spawn_probability = 0.01;
+                            world.enemy_spawn_probability = 0.1;
+
+                            world.add_timer(
+                                "duration_score",
+                                WorldTimer::new(Duration::from_secs(10), true),
+                                |world| {
+                                    world.player.score += 10;
+                                },
+                            );
+                        })
+                    });
                 });
-
-                world.fuel_spawn_probability = 0.01;
-                world.enemy_spawn_probability = 0.1;
-
-                world.add_timer(
-                    "duration_score",
-                    WorldTimer::new(Duration::from_secs(10), true),
-                );
-            },
-        );
-
-        // Increase point automatically every 10 secs
-        self.add_event_handler(WorldEvent::new(
-            WorldEventTrigger::timer_elapsed("duration_score"),
-            true,
-            |world| {
-                world.player.score += 10;
             },
         ));
     }

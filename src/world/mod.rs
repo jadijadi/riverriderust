@@ -5,6 +5,7 @@ use std::{
 };
 
 use rand::{rngs::ThreadRng, thread_rng};
+use uuid::Uuid;
 
 use crate::{
     canvas::Canvas,
@@ -113,7 +114,9 @@ pub struct World<'g> {
     pub elapsed_loops: usize,
     pub timers: RefCell<HashMap<String, WorldTimer>>, // RefCell for interior mutability
     pub custom_drawings: HashMap<String, Box<dyn Drawable>>,
-    pub pending_events: Vec<WorldEvent<'g>>,
+
+    /// Events that may be added inside game loops
+    pub new_events: Vec<WorldEvent<'g>>,
 }
 
 impl<'g> World<'g> {
@@ -142,7 +145,7 @@ impl<'g> World<'g> {
             custom_drawings: HashMap::new(),
             enemy_spawn_probability: 0.0,
             fuel_spawn_probability: 0.0,
-            pending_events: Vec::new(),
+            new_events: Vec::new(),
         }
     }
 
@@ -167,9 +170,20 @@ impl<'g> World<'g> {
         }
     }
 
-    pub fn add_timer(&mut self, key: impl Into<String>, timer: WorldTimer) {
+    pub fn add_timer(
+        &mut self,
+        key: impl Into<String>,
+        timer: WorldTimer,
+        on_elapsed: impl Fn(&mut World) + 'g,
+    ) {
+        let is_repeat = timer.repeat;
         let key: String = key.into();
         self.timers.get_mut().insert(key.clone(), timer);
+        self.add_event_handler(WorldEvent::new(
+            WorldEventTrigger::TimerElapsed(key),
+            is_repeat,
+            on_elapsed,
+        ));
     }
 
     pub fn add_drawing(&mut self, key: impl Into<String>, drawing: impl Drawable + 'static) {
@@ -181,6 +195,20 @@ impl<'g> World<'g> {
     }
 
     pub fn add_event_handler(&mut self, event: WorldEvent<'g>) {
-        self.pending_events.push(event);
+        self.new_events.push(event);
+    }
+
+    pub fn temp_popup(
+        &mut self,
+        message: impl Into<String>,
+        duration: Duration,
+        after: impl Fn(&mut World) + 'g,
+    ) {
+        let key = Uuid::new_v4().to_string();
+        self.add_drawing(&key, self.popup(message));
+        self.add_timer(&key.clone(), WorldTimer::new(duration, false), move |w| {
+            w.clear_drawing(&key);
+            after(w);
+        });
     }
 } // end of World implementation.

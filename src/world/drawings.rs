@@ -18,13 +18,13 @@ use crate::{
     World,
 };
 
-pub struct NotificationDrawing {
+pub struct PopupDrawing {
     max_c: u16,
     max_l: u16,
     message: String,
 }
 
-impl NotificationDrawing {
+impl PopupDrawing {
     pub fn new(max_c: u16, max_l: u16, message: String) -> Self {
         Self {
             max_c,
@@ -34,7 +34,7 @@ impl NotificationDrawing {
     }
 }
 
-impl Drawable for NotificationDrawing {
+impl Drawable for PopupDrawing {
     fn draw(&self, sc: &mut crate::canvas::Canvas) {
         let message_len = self.message.len();
         let line_1 = format!("╔═{}═╗", "═".repeat(message_len));
@@ -58,8 +58,8 @@ impl Drawable for NotificationDrawing {
 }
 
 impl<'g> World<'g> {
-    pub fn notification(&self, message: impl Into<String>) -> NotificationDrawing {
-        NotificationDrawing::new(self.maxc, self.maxl, message.into())
+    pub fn popup(&self, message: impl Into<String>) -> PopupDrawing {
+        PopupDrawing::new(self.maxc, self.maxl, message.into())
     }
 
     pub fn draw_on_canvas(&mut self) {
@@ -104,7 +104,7 @@ impl<'g> World<'g> {
     }
 
     pub fn pause_screen(&mut self) {
-        self.canvas.draw(&self.notification("Game Paused!"));
+        self.canvas.draw(&self.popup("Game Paused!"));
     }
 }
 

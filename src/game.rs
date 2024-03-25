@@ -61,9 +61,13 @@ impl<'g> Game<'g> {
             match world_status {
                 WorldStatus::Fluent => {
                     self.run_events();
-                    // Draw drawings on canvas first
-                    let world = &mut self.world.borrow_mut();
 
+                    let new_events: Vec<WorldEvent<'g>> =
+                        self.world.borrow_mut().new_events.drain(0..).collect();
+                    for event in new_events {
+                        self.add_event_handler(event)
+                    }
+                    // Draw drawings on canvas first
                     self.world.borrow_mut().draw_on_canvas();
                 }
                 WorldStatus::Paused => self.world.borrow_mut().pause_screen(),
