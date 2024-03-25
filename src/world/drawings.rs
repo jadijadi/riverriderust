@@ -5,11 +5,15 @@ use std::{
     time::Duration,
 };
 
-use crossterm::event::{poll, read};
+use crossterm::{
+    event::{poll, read},
+    style::Stylize,
+};
 
 use crate::{
     drawable::Drawable,
     entities::{DeathCause, PlayerStatus},
+    game::Game,
     stout_ext::StdoutExt,
     World,
 };
@@ -53,19 +57,12 @@ impl Drawable for NotificationDrawing {
     }
 }
 
-impl World {
+impl<'g> World<'g> {
     pub fn notification(&self, message: impl Into<String>) -> NotificationDrawing {
         NotificationDrawing::new(self.maxc, self.maxl, message.into())
     }
 
-    pub fn clear_screen<'a>(
-        &'a self,
-        stdout: &'a mut Stdout,
-    ) -> Result<&mut Stdout, std::io::Error> {
-        stdout.clear_all()
-    }
-
-    pub(super) fn draw_on_canvas(&mut self) {
+    pub fn draw_on_canvas(&mut self) {
         self.canvas.clear_all();
 
         // draw the map
@@ -76,9 +73,9 @@ impl World {
             .draw_line((2, 3), format!(" Fuel: {} ", self.player.gas / 100))
             .draw_line((2, 4), format!(" Enemies: {} ", self.enemies.len()))
             .draw_line((2, 5), format!(" Traveled: {} ", self.player.traveled))
-            .draw_line((2, 6), format!(" (dbg) Events: {} ", self.events.len()))
+            // .draw_line((2, 6), format!(" (dbg) Events: {} ", self.events.len()))
             .draw_line(
-                (2, 7),
+                (2, 6),
                 format!(" (dbg) Timers: {} ", self.timers.borrow().len()),
             );
 
@@ -106,21 +103,32 @@ impl World {
         }
     }
 
-    pub(super) fn pause_screen(&mut self) {
+    pub fn pause_screen(&mut self) {
         self.canvas.draw(&self.notification("Game Paused!"));
+    }
+}
+
+impl<'g> Game<'g> {
+    pub fn clear_screen<'a>(
+        &'a self,
+        stdout: &'a mut Stdout,
+    ) -> Result<&mut Stdout, std::io::Error> {
+        stdout.clear_all()
     }
 
     pub fn welcome_screen(&self, stdout: &mut Stdout) -> Result<(), std::io::Error> {
+        let world = &self.world.borrow();
+
         let welcome_msg: &str = "██████╗ ██╗██╗   ██╗███████╗██████╗ ██████╗  █████╗ ██╗██████╗     ██████╗ ██╗   ██╗███████╗████████╗\n\r██╔══██╗██║██║   ██║██╔════╝██╔══██╗██╔══██╗██╔══██╗██║██╔══██╗    ██╔══██╗██║   ██║██╔════╝╚══██╔══╝\n\r██████╔╝██║██║   ██║█████╗  ██████╔╝██████╔╝███████║██║██║  ██║    ██████╔╝██║   ██║███████╗   ██║   \n\r██╔══██╗██║╚██╗ ██╔╝██╔══╝  ██╔══██╗██╔══██╗██╔══██║██║██║  ██║    ██╔══██╗██║   ██║╚════██║   ██║   \n\r██║  ██║██║ ╚████╔╝ ███████╗██║  ██║██║  ██║██║  ██║██║██████╔╝    ██║  ██║╚██████╔╝███████║   ██║   \n\r╚═╝  ╚═╝╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═════╝     ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   \n";
         self.clear_screen(stdout)?;
 
-        if self.maxc > 100 {
+        if world.maxc > 100 {
             stdout.draw((0, 2), welcome_msg)?;
         } else {
             stdout.draw((0, 2), "RiverRaid Rust")?;
         }
 
-        stdout.draw((2, self.maxl - 2), "Press any key to continue...")?;
+        stdout.draw((2, world.maxl - 2), "Press any key to continue...")?;
         stdout.flush()?;
 
         loop {
@@ -135,6 +143,8 @@ impl World {
     }
 
     pub fn goodbye_screen(&self, stdout: &mut Stdout) -> Result<(), std::io::Error> {
+        let world = &self.world.borrow();
+
         let goodbye_msg1: &str = " ██████╗  ██████╗  ██████╗ ██████╗      ██████╗  █████╗ ███╗   ███╗███████╗██╗\n\r██╔════╝ ██╔═══██╗██╔═══██╗██╔══██╗    ██╔════╝ ██╔══██╗████╗ ████║██╔════╝██║\n\r██║  ███╗██║   ██║██║   ██║██║  ██║    ██║  ███╗███████║██╔████╔██║█████╗  ██║\n\r██║   ██║██║   ██║██║   ██║██║  ██║    ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝  ╚═╝\n\r╚██████╔╝╚██████╔╝╚██████╔╝██████╔╝    ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗██╗\n\r ╚═════╝  ╚═════╝  ╚═════╝ ╚═════╝      ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚═╝\n";
         let goodbye_msg2: &str = "████████╗██╗  ██╗ █████╗ ███╗   ██╗██╗  ██╗███████╗\n\r╚══██╔══╝██║  ██║██╔══██╗████╗  ██║██║ ██╔╝██╔════╝\n\r   ██║   ███████║███████║██╔██╗ ██║█████╔╝ ███████╗\n\r   ██║   ██╔══██║██╔══██║██║╚██╗██║██╔═██╗ ╚════██║\n\r   ██║   ██║  ██║██║  ██║██║ ╚████║██║  ██╗███████║██╗\n\r   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝╚═╝\n";
 
@@ -142,25 +152,25 @@ impl World {
             .draw((0, 2), goodbye_msg1)?
             .draw((0, 10), goodbye_msg2)?;
 
-        stdout.move_cursor((2, self.maxl - 5))?;
-        if let PlayerStatus::Dead(cause) = &self.player.status {
+        stdout.move_cursor((2, world.maxl - 5))?;
+        if let PlayerStatus::Dead(cause) = &world.player.status {
             match cause {
                 DeathCause::Ground => {
-                    if self.maxc > 91 {
+                    if world.maxc > 91 {
                         stdout.print("\r█▄█ █▀█ █░█   █▀▀ █▀█ ▄▀█ █▀ █░█ █▀▀ █▀▄   █ █▄░█   ▀█▀ █░█ █▀▀   █▀▀ █▀█ █▀█ █░█ █▄░█ █▀▄ ░\n\r░█░ █▄█ █▄█   █▄▄ █▀▄ █▀█ ▄█ █▀█ ██▄ █▄▀   █ █░▀█   ░█░ █▀█ ██▄   █▄█ █▀▄ █▄█ █▄█ █░▀█ █▄▀ ▄\n\r")?;
                     } else {
                         stdout.print("You crashed in the ground.")?;
                     }
                 }
                 DeathCause::Enemy => {
-                    if self.maxc > 72 {
+                    if world.maxc > 72 {
                         stdout.print("\r▄▀█ █▄░█   █▀▀ █▄░█ █▀▀ █▀▄▀█ █▄█   █▄▀ █ █░░ █░░ █▀▀ █▀▄   █▄█ █▀█ █░█ ░\n\r█▀█ █░▀█   ██▄ █░▀█ ██▄ █░▀░█ ░█░   █░█ █ █▄▄ █▄▄ ██▄ █▄▀   ░█░ █▄█ █▄█ ▄\n\r")?;
                     } else {
                         stdout.print("An enemy killed you.")?;
                     }
                 }
                 DeathCause::Fuel => {
-                    if self.maxc > 69 {
+                    if world.maxc > 69 {
                         stdout.print("\r█▄█ █▀█ █░█   █▀█ ▄▀█ █▄░█   █▀█ █░█ ▀█▀   █▀█ █▀▀   █▀▀ █░█ █▀▀ █░░ ░\n\r░█░ █▄█ █▄█   █▀▄ █▀█ █░▀█   █▄█ █▄█ ░█░   █▄█ █▀░   █▀░ █▄█ ██▄ █▄▄ ▄\n\r")?;
                     } else {
                         stdout.print("You ran out of fuel.")?;
@@ -169,12 +179,12 @@ impl World {
             }
         } else {
             // Quit
-            if self.player.status != PlayerStatus::Quit {
+            if world.player.status != PlayerStatus::Quit {
                 unreachable!("Undead player has no death cause!")
             }
         }
 
-        stdout.move_cursor((2, self.maxl - 2))?;
+        stdout.move_cursor((2, world.maxl - 2))?;
         thread::sleep(Duration::from_millis(2000));
         stdout.print("Press any key to continue...")?;
         stdout.flush()?;

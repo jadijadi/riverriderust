@@ -1,3 +1,4 @@
+use game::Game;
 use std::io::stdout;
 use stout_ext::StdoutExt;
 
@@ -12,6 +13,7 @@ mod canvas;
 mod drawable;
 mod entities;
 mod events;
+mod game;
 mod stout_ext;
 mod world;
 
@@ -24,23 +26,26 @@ fn main() -> std::io::Result<()> {
 
     // init the world
     let slowness = 75;
-    let mut world = World::new(maxc, maxl);
+    let world = World::new(maxc, maxl);
+
+    let mut game = Game::new(world);
 
     // Events that are running forever once in each loop
-    world.setup_event_handlers();
+    game.setup_event_handlers();
 
     // show welcoming banner
-    world.welcome_screen(&mut sc)?;
+    game.welcome_screen(&mut sc)?;
 
     // Main game loop
     // - Events
     // - Physics
     // - Drawing
-    world.game_loop(&mut sc, slowness)?;
+    // TODO:
+    game.game_loop(&mut sc, slowness)?;
 
     // game is finished
-    world.clear_screen(&mut sc)?;
-    world.goodbye_screen(&mut sc)?;
+    game.clear_screen(&mut sc)?;
+    game.goodbye_screen(&mut sc)?;
 
     sc.clear_all()?.execute(Show)?;
     disable_raw_mode()?;

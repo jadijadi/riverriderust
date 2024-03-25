@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use rand::Rng;
 
-use crate::entities::{DeathCause, Enemy, EntityStatus, Fuel, PlayerStatus};
+use crate::{
+    entities::{DeathCause, Enemy, EntityStatus, Fuel, PlayerStatus},
+    game::Game,
+};
 
 use super::{map::RiverMode, World, WorldEvent, WorldEventTrigger, WorldTimer};
 
@@ -142,69 +145,69 @@ fn move_fuel(world: &mut World) {
     });
 }
 
-impl World {
+impl<'g> Game<'g> {
     pub fn setup_event_handlers(&mut self) {
         // ---- Permanent event, running on every loop (is_continues: true) ----
         // check if player hit the ground
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            &check_player_status,
+            check_player_status,
         ));
 
         // check enemy hit something
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            &check_enemy_status,
+            check_enemy_status,
         ));
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            &check_fuel_status,
+            check_fuel_status,
         ));
 
         // move the map Downward
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            &|world| world.map.update(&mut world.rng),
+            |world| world.map.update(&mut world.rng),
         ));
 
         // create new enemy
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            &create_enemy,
+            create_enemy,
         ));
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            &create_fuel,
+            create_fuel,
         ));
 
         // Move elements along map movements
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            &move_enemies,
+            move_enemies,
         ));
 
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            &move_fuel,
+            move_fuel,
         ));
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            &move_bullets,
+            move_bullets,
         ));
 
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            &|world| {
+            |world| {
                 if world.player.gas >= 1 {
                     world.player.gas -= 1;
                 }
@@ -214,7 +217,7 @@ impl World {
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            &|world| {
+            |world| {
                 world.player.traveled += 1;
             },
         ));
@@ -223,54 +226,43 @@ impl World {
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::GameStarted,
             false,
-            &|world| {
+            |world| {
                 world.map.change_river_mode(RiverMode::ConstWidthAndCenter {
                     width: world.maxc / 2,
                     center_c: world.maxc / 2,
                 });
 
                 world.add_drawing("warmup", world.notification("Warmup"));
+            },
+        ));
+
+        self.add_timer(
+            "warmup",
+            WorldTimer::new(Duration::from_secs(10), false),
+            |world| {
+                world.clear_drawing("warmup");
+                world.map.change_river_mode(RiverMode::Random {
+                    min_width: 5,
+                    max_width: world.maxc / 3,
+                    max_center_diff: 5,
+                });
+
+                world.fuel_spawn_probability = 0.01;
+                world.enemy_spawn_probability = 0.1;
 
                 world.add_timer(
-                    "warmup",
-                    WorldTimer::new(Duration::from_secs(10), false),
-                    &|world| {
-                        world.clear_drawing("warmup");
-                        world.add_drawing("ready", world.notification("Ready!!"));
-                        world.add_timer(
-                            "ready",
-                            WorldTimer::new(Duration::from_secs(2), false),
-                            &|world| {
-                                world.clear_drawing("ready");
-                                world.add_drawing("go", world.notification("!!! GO !!!"));
-                                world.add_timer(
-                                    "go",
-                                    WorldTimer::new(Duration::from_secs(1), false),
-                                    &|world| {
-                                        world.clear_drawing("go");
-                                        world.map.change_river_mode(RiverMode::Random {
-                                            min_width: 5,
-                                            max_width: world.maxc / 3,
-                                            max_center_diff: 5,
-                                        });
-
-                                        world.fuel_spawn_probability = 0.01;
-                                        world.enemy_spawn_probability = 0.1;
-
-                                        // Increase point automatically every 10 secs
-                                        world.add_timer(
-                                            "duration_score",
-                                            WorldTimer::new(Duration::from_secs(10), true),
-                                            &|world| {
-                                                world.player.score += 10;
-                                            },
-                                        );
-                                    },
-                                )
-                            },
-                        );
-                    },
+                    "duration_score",
+                    WorldTimer::new(Duration::from_secs(10), true),
                 );
+            },
+        );
+
+        // Increase point automatically every 10 secs
+        self.add_event_handler(WorldEvent::new(
+            WorldEventTrigger::timer_elapsed("duration_score"),
+            true,
+            |world| {
+                world.player.score += 10;
             },
         ));
     }
