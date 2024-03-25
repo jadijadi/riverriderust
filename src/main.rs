@@ -26,9 +26,8 @@ fn main() -> std::io::Result<()> {
 
     // init the world
     let slowness = 75;
-    let world = World::new(maxc, maxl);
 
-    let mut game = Game::new(world);
+    let mut game = Game::new(maxc, maxl);
 
     // Events that are running forever once in each loop
     game.setup_event_handlers();

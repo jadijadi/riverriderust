@@ -69,6 +69,7 @@ impl RiverPart {
     }
 }
 
+#[derive(Clone)]
 #[allow(dead_code)]
 pub enum RiverMode {
     Random {
@@ -95,6 +96,7 @@ pub struct Map {
     max_c: u16,
     max_l: u16,
     river_mode: RiverMode,
+    river_mode_default: RiverMode,
     river_parts: VecDeque<RiverPart>,
     next_point: u16,
     change_rate: u16,
@@ -123,6 +125,11 @@ impl Map {
         change_rate: u16,
         max_center_diff: u16,
     ) -> Self {
+        let river_mode = RiverMode::Random {
+            min_width,
+            max_width,
+            max_center_diff,
+        };
         Self {
             max_c,
             max_l,
@@ -131,11 +138,8 @@ impl Map {
                 .map(|_| RiverPart::new(max_width, max_c / 2))
                 .collect(),
             change_rate,
-            river_mode: RiverMode::Random {
-                min_width,
-                max_width,
-                max_center_diff,
-            },
+            river_mode: river_mode.clone(),
+            river_mode_default: river_mode,
             target_river: RiverPart::new(max_width, max_c / 2),
         }
     }
@@ -188,6 +192,10 @@ impl Map {
 
     pub fn change_river_mode(&mut self, mode: RiverMode) {
         self.river_mode = mode;
+    }
+
+    pub fn restore_river_mode(&mut self) {
+        self.river_mode = self.river_mode_default.clone();
     }
 
     pub fn front(&self) -> Option<&RiverPart> {

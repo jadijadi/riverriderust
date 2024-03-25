@@ -52,6 +52,7 @@ pub enum WorldEventTrigger {
 }
 
 impl WorldEventTrigger {
+    #[allow(dead_code)]
     pub fn timer_elapsed(timer_key: impl Into<String>) -> Self {
         Self::TimerElapsed(timer_key.into())
     }
@@ -111,6 +112,7 @@ pub struct World<'g> {
     pub bullets: Vec<Bullet>,
     pub rng: ThreadRng, // Local rng for the whole world
 
+    pub elapsed_time: usize,
     pub elapsed_loops: usize,
     pub timers: RefCell<HashMap<String, WorldTimer>>, // RefCell for interior mutability
     pub custom_drawings: HashMap<String, Box<dyn Drawable>>,
@@ -122,6 +124,7 @@ pub struct World<'g> {
 impl<'g> World<'g> {
     pub fn new(maxc: u16, maxl: u16) -> World<'g> {
         World {
+            elapsed_time: 0,
             elapsed_loops: 0,
             status: WorldStatus::Fluent,
             canvas: Canvas::new(maxc, maxl),
@@ -170,14 +173,9 @@ impl<'g> World<'g> {
         }
     }
 
-    pub fn add_timer(
-        &mut self,
-        key: impl Into<String>,
-        timer: WorldTimer,
-        on_elapsed: impl Fn(&mut World) + 'g,
-    ) {
+    pub fn add_timer(&mut self, timer: WorldTimer, on_elapsed: impl Fn(&mut World) + 'g) {
         let is_repeat = timer.repeat;
-        let key: String = key.into();
+        let key: String = Uuid::new_v4().to_string();
         self.timers.get_mut().insert(key.clone(), timer);
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::TimerElapsed(key),
@@ -206,7 +204,7 @@ impl<'g> World<'g> {
     ) {
         let key = Uuid::new_v4().to_string();
         self.add_drawing(&key, self.popup(message));
-        self.add_timer(&key.clone(), WorldTimer::new(duration, false), move |w| {
+        self.add_timer(WorldTimer::new(duration, false), move |w| {
             w.clear_drawing(&key);
             after(w);
         });

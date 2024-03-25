@@ -5,10 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crossterm::{
-    event::{poll, read},
-    style::Stylize,
-};
+use crossterm::event::{poll, read};
 
 use crate::{
     drawable::Drawable,
@@ -37,23 +34,20 @@ impl PopupDrawing {
 impl Drawable for PopupDrawing {
     fn draw(&self, sc: &mut crate::canvas::Canvas) {
         let message_len = self.message.len();
-        let line_1 = format!("╔═{}═╗", "═".repeat(message_len));
-        let line_2 = format!("║ {} ║", self.message);
-        let line_3 = format!("╚═{}═╝", "═".repeat(message_len));
+        let line_0 = format!("    {}    ", " ".repeat(message_len));
+        let line_1 = format!("  ╔═{}═╗  ", "═".repeat(message_len));
+        let line_2 = format!("  ║ {} ║  ", self.message);
+        let line_3 = format!("  ╚═{}═╝  ", "═".repeat(message_len));
+        let line_4 = format!("    {}    ", " ".repeat(message_len));
 
-        let message_len_offset = (message_len / 2) as u16 + 2;
-        sc.draw_line(
-            (self.max_c / 2 - message_len_offset, self.max_l / 2 - 1),
-            line_1,
-        )
-        .draw_line(
-            (self.max_c / 2 - message_len_offset, self.max_l / 2),
-            line_2,
-        )
-        .draw_line(
-            (self.max_c / 2 - message_len_offset, self.max_l / 2 + 1),
-            line_3,
-        );
+        let message_len_offset = (message_len / 2) as u16 + 4;
+        let col = self.max_c / 2 - message_len_offset;
+        let center_l = self.max_l / 2;
+        sc.draw_line((col, center_l - 2), line_0)
+            .draw_line((col, center_l - 1), line_1)
+            .draw_line((col, center_l), line_2)
+            .draw_line((col, center_l + 1), line_3)
+            .draw_line((col, center_l + 2), line_4);
     }
 }
 
@@ -67,17 +61,6 @@ impl<'g> World<'g> {
 
         // draw the map
         self.canvas.draw(&self.map);
-
-        self.canvas
-            .draw_line(2, format!(" Score: {} ", self.player.score))
-            .draw_line((2, 3), format!(" Fuel: {} ", self.player.gas / 100))
-            .draw_line((2, 4), format!(" Enemies: {} ", self.enemies.len()))
-            .draw_line((2, 5), format!(" Traveled: {} ", self.player.traveled))
-            // .draw_line((2, 6), format!(" (dbg) Events: {} ", self.events.len()))
-            .draw_line(
-                (2, 6),
-                format!(" (dbg) Timers: {} ", self.timers.borrow().len()),
-            );
 
         // draw fuel
         for fuel in self.fuels.iter() {
@@ -114,6 +97,27 @@ impl<'g> Game<'g> {
         stdout: &'a mut Stdout,
     ) -> Result<&mut Stdout, std::io::Error> {
         stdout.clear_all()
+    }
+
+    pub fn draw_status(&self) {
+        let events = self.events_len();
+        let mut world = self.world.borrow_mut();
+        let score = world.player.score;
+        let gas = world.player.gas / 100;
+        let enemies = world.enemies.len();
+        let traveled = world.player.traveled;
+        let timers = world.timers.borrow().len();
+        let elapsed_time = world.elapsed_time;
+
+        world
+            .canvas
+            .draw_line(2, format!(" Score: {} ", score))
+            .draw_line((2, 3), format!(" Fuel: {} ", gas / 100))
+            .draw_line((2, 4), format!(" Time: {}s ", elapsed_time))
+            .draw_line((2, 5), format!(" Enemies: {} ", enemies))
+            .draw_line((2, 6), format!(" Traveled: {} ", traveled))
+            .draw_line((2, 7), format!(" (dbg) Events: {} ", events))
+            .draw_line((2, 8), format!(" (dbg) Timers: {} ", timers));
     }
 
     pub fn welcome_screen(&self, stdout: &mut Stdout) -> Result<(), std::io::Error> {

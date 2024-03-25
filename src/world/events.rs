@@ -222,6 +222,28 @@ impl<'g> Game<'g> {
             },
         ));
 
+        // At this point it's very simple to add stages to the game, using events.
+        // - This's an example: Every 60 sec move river to center
+        //      then go back to normal and increase enemies spawn chance.
+        self.add_timer(WorldTimer::new(Duration::from_secs(60), true), |world| {
+            world.map.change_river_mode(RiverMode::ConstWidthAndCenter {
+                width: world.maxc / 2,
+                center_c: world.maxc / 2,
+            });
+
+            world.temp_popup("^ ^ ^", Duration::from_secs(1), |world| {
+                if world.enemy_spawn_probability < 1.0 {
+                    world.enemy_spawn_probability += 0.1;
+                }
+                world.map.restore_river_mode();
+            });
+        });
+
+        // Update elapsed time every 1 sec
+        self.add_timer(WorldTimer::new(Duration::from_secs(1), true), |world| {
+            world.elapsed_time += 1;
+        });
+
         // ---- Temporary events: Triggered on specified conditions (is_continues: false) ----
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::GameStarted,
@@ -235,17 +257,12 @@ impl<'g> Game<'g> {
                 world.temp_popup("Warmup", Duration::from_secs(10), |world| {
                     world.temp_popup("Ready !!", Duration::from_secs(2), |world| {
                         world.temp_popup("!!! GO !!!", Duration::from_secs(1), |world| {
-                            world.map.change_river_mode(RiverMode::Random {
-                                min_width: 5,
-                                max_width: world.maxc / 3,
-                                max_center_diff: 5,
-                            });
+                            world.map.restore_river_mode();
 
                             world.fuel_spawn_probability = 0.01;
                             world.enemy_spawn_probability = 0.1;
 
                             world.add_timer(
-                                "duration_score",
                                 WorldTimer::new(Duration::from_secs(10), true),
                                 |world| {
                                     world.player.score += 10;

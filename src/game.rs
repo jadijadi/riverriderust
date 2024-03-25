@@ -1,5 +1,7 @@
 use std::{cell::RefCell, io::Stdout, thread, time::Duration};
 
+use uuid::Uuid;
+
 use crate::{
     entities::PlayerStatus,
     events::handle_pressed_keys,
@@ -12,9 +14,9 @@ pub struct Game<'g> {
 }
 
 impl<'g> Game<'g> {
-    pub fn new(world: World<'g>) -> Self {
+    pub fn new(max_c: u16, max_l: u16) -> Self {
         Self {
-            world: RefCell::new(world),
+            world: RefCell::new(World::new(max_c, max_l)),
             events: Vec::new(),
         }
     }
@@ -23,14 +25,10 @@ impl<'g> Game<'g> {
         self.events.push(event);
     }
 
-    pub fn add_timer(
-        &mut self,
-        key: impl Into<String>,
-        timer: WorldTimer,
-        on_elapsed: impl Fn(&mut World) + 'g,
-    ) {
+    #[allow(dead_code)]
+    pub fn add_timer(&mut self, timer: WorldTimer, on_elapsed: impl Fn(&mut World) + 'g) {
         let is_repeat = timer.repeat;
-        let key: String = key.into();
+        let key: String = Uuid::new_v4().to_string();
         self.world
             .borrow_mut()
             .timers
@@ -69,6 +67,7 @@ impl<'g> Game<'g> {
                     }
                     // Draw drawings on canvas first
                     self.world.borrow_mut().draw_on_canvas();
+                    self.draw_status();
                 }
                 WorldStatus::Paused => self.world.borrow_mut().pause_screen(),
             }
@@ -82,5 +81,9 @@ impl<'g> Game<'g> {
         }
 
         Ok(())
+    }
+
+    pub fn events_len(&self) -> usize {
+        self.events.len()
     }
 }
