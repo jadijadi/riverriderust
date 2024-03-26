@@ -1,3 +1,4 @@
+use game::Game;
 use std::io::stdout;
 use stout_ext::StdoutExt;
 
@@ -6,16 +7,15 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, size},
     ExecutableCommand,
 };
+use world::World;
 
 mod canvas;
 mod drawable;
 mod entities;
 mod events;
+mod game;
 mod stout_ext;
 mod world;
-
-use events::*;
-use world::*;
 
 fn main() -> std::io::Result<()> {
     // init the screen
@@ -25,21 +25,26 @@ fn main() -> std::io::Result<()> {
     enable_raw_mode()?;
 
     // init the world
-    let slowness = 60;
-    let mut world = World::new(maxc, maxl);
+    let slowness = 75;
+
+    let mut game = Game::new(maxc, maxl);
+
+    // Events that are running forever once in each loop
+    game.setup_event_handlers();
 
     // show welcoming banner
-    world.welcome_screen(&mut sc)?;
+    game.welcome_screen(&mut sc)?;
 
     // Main game loop
     // - Events
     // - Physics
     // - Drawing
-    world.game_loop(&mut sc, slowness)?;
+    // TODO:
+    game.game_loop(&mut sc, slowness)?;
 
     // game is finished
-    world.clear_screen(&mut sc)?;
-    world.goodbye_screen(&mut sc)?;
+    game.clear_screen(&mut sc)?;
+    game.goodbye_screen(&mut sc)?;
 
     sc.clear_all()?.execute(Show)?;
     disable_raw_mode()?;
