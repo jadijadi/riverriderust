@@ -4,6 +4,7 @@ use std::{
     time::{self, Duration, Instant},
 };
 
+use crossterm::style::ContentStyle;
 use rand::{rngs::ThreadRng, thread_rng};
 use uuid::Uuid;
 
@@ -201,9 +202,10 @@ impl<'g> World<'g> {
         message: impl Into<String>,
         duration: Duration,
         after: impl Fn(&mut World) + 'g,
+        style: impl Into<Option<ContentStyle>>,
     ) {
         let key = Uuid::new_v4().to_string();
-        self.add_drawing(&key, self.popup(message));
+        self.add_drawing(&key, self.popup(message, style));
         self.add_timer(WorldTimer::new(duration, false), move |w| {
             w.clear_drawing(&key);
             after(w);

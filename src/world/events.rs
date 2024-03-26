@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use crossterm::style::{ContentStyle, Stylize};
 use rand::Rng;
 
 use crate::{
@@ -222,22 +223,32 @@ impl<'g> Game<'g> {
             },
         ));
 
+        let style = ContentStyle::new().green().on_magenta();
+
         // At this point it's very simple to add stages to the game, using events.
         // - This's an example: Every 60 sec move river to center
         //      then go back to normal and increase enemies spawn chance.
-        self.add_timer(WorldTimer::new(Duration::from_secs(60), true), |world| {
-            world.map.change_river_mode(RiverMode::ConstWidthAndCenter {
-                width: world.maxc / 2,
-                center_c: world.maxc / 2,
-            });
+        self.add_timer(
+            WorldTimer::new(Duration::from_secs(60), true),
+            move |world| {
+                world.map.change_river_mode(RiverMode::ConstWidthAndCenter {
+                    width: world.maxc / 2,
+                    center_c: world.maxc / 2,
+                });
 
-            world.temp_popup("^ ^ ^", Duration::from_secs(1), |world| {
-                if world.enemy_spawn_probability < 1.0 {
-                    world.enemy_spawn_probability += 0.1;
-                }
-                world.map.restore_river_mode();
-            });
-        });
+                world.temp_popup(
+                    "^ ^ ^",
+                    Duration::from_secs(1),
+                    |world| {
+                        if world.enemy_spawn_probability < 1.0 {
+                            world.enemy_spawn_probability += 0.1;
+                        }
+                        world.map.restore_river_mode();
+                    },
+                    style,
+                );
+            },
+        );
 
         // Update elapsed time every 1 sec
         self.add_timer(WorldTimer::new(Duration::from_secs(1), true), |world| {
@@ -248,29 +259,44 @@ impl<'g> Game<'g> {
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::GameStarted,
             false,
-            |world| {
+            move |world| {
                 world.map.change_river_mode(RiverMode::ConstWidthAndCenter {
                     width: world.maxc / 2,
                     center_c: world.maxc / 2,
                 });
 
-                world.temp_popup("Warmup", Duration::from_secs(10), |world| {
-                    world.temp_popup("Ready !!", Duration::from_secs(2), |world| {
-                        world.temp_popup("!!! GO !!!", Duration::from_secs(1), |world| {
-                            world.map.restore_river_mode();
+                world.temp_popup(
+                    "Warmup",
+                    Duration::from_secs(10),
+                    move |world| {
+                        world.temp_popup(
+                            "Ready !!",
+                            Duration::from_secs(2),
+                            move |world| {
+                                world.temp_popup(
+                                    "!!! GO !!!",
+                                    Duration::from_secs(1),
+                                    |world| {
+                                        world.map.restore_river_mode();
 
-                            world.fuel_spawn_probability = 0.01;
-                            world.enemy_spawn_probability = 0.1;
+                                        world.fuel_spawn_probability = 0.01;
+                                        world.enemy_spawn_probability = 0.1;
 
-                            world.add_timer(
-                                WorldTimer::new(Duration::from_secs(10), true),
-                                |world| {
-                                    world.player.score += 10;
-                                },
-                            );
-                        })
-                    });
-                });
+                                        world.add_timer(
+                                            WorldTimer::new(Duration::from_secs(10), true),
+                                            |world| {
+                                                world.player.score += 10;
+                                            },
+                                        );
+                                    },
+                                    style,
+                                )
+                            },
+                            style,
+                        );
+                    },
+                    style,
+                );
             },
         ));
     }

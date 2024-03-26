@@ -7,7 +7,7 @@ use std::{
 
 use crossterm::{
     event::{poll, read},
-    style::{ContentStyle, Stylize},
+    style::ContentStyle,
 };
 
 use crate::{
@@ -22,14 +22,21 @@ pub struct PopupDrawing {
     max_c: u16,
     max_l: u16,
     message: String,
+    style: Option<ContentStyle>,
 }
 
 impl PopupDrawing {
-    pub fn new(max_c: u16, max_l: u16, message: String) -> Self {
+    pub fn new(
+        max_c: u16,
+        max_l: u16,
+        message: String,
+        style: impl Into<Option<ContentStyle>>,
+    ) -> Self {
         Self {
             max_c,
             max_l,
             message,
+            style: style.into(),
         }
     }
 }
@@ -47,16 +54,20 @@ impl Drawable for PopupDrawing {
         let col = self.max_c / 2 - message_len_offset;
         let center_l = self.max_l / 2;
         sc.draw_line((col, center_l - 2), line_0)
-            .draw_line((col, center_l - 1), line_1)
-            .draw_line((col, center_l), line_2)
-            .draw_line((col, center_l + 1), line_3)
+            .draw_styled_line((col, center_l - 1), line_1, self.style)
+            .draw_styled_line((col, center_l), line_2, self.style)
+            .draw_styled_line((col, center_l + 1), line_3, self.style)
             .draw_line((col, center_l + 2), line_4);
     }
 }
 
 impl<'g> World<'g> {
-    pub fn popup(&self, message: impl Into<String>) -> PopupDrawing {
-        PopupDrawing::new(self.maxc, self.maxl, message.into())
+    pub fn popup(
+        &self,
+        message: impl Into<String>,
+        style: impl Into<Option<ContentStyle>>,
+    ) -> PopupDrawing {
+        PopupDrawing::new(self.maxc, self.maxl, message.into(), style)
     }
 
     pub fn draw_on_canvas(&mut self) {
@@ -90,7 +101,7 @@ impl<'g> World<'g> {
     }
 
     pub fn pause_screen(&mut self) {
-        self.canvas.draw(&self.popup("Game Paused!"));
+        self.canvas.draw(&self.popup("Game Paused!", None));
     }
 }
 
