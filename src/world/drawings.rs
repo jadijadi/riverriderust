@@ -5,7 +5,10 @@ use std::{
     time::Duration,
 };
 
-use crossterm::event::{poll, read};
+use crossterm::{
+    event::{poll, read},
+    style::{ContentStyle, Stylize},
+};
 
 use crate::{
     drawable::Drawable,

@@ -3,6 +3,8 @@ use std::{
     io::{Stdout, Write as Wt},
 };
 
+use crossterm::style::{ContentStyle, StyledContent};
+
 use crate::{
     drawable::Drawable,
     stout_ext::{AsLocationTuple, StdoutExt},
@@ -11,14 +13,23 @@ use crate::{
 #[derive(Clone, PartialEq, Eq)]
 pub enum Block {
     Empty,
-    Acquired(char),
+    Acquired {
+        style: Option<ContentStyle>,
+        character: char,
+    },
 }
 
 impl Display for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Block::Empty => f.write_char(' '),
-            Block::Acquired(c) => f.write_char(*c),
+            Block::Acquired { style, character } => {
+                if let Some(style) = style {
+                    StyledContent::new(*style, character).fmt(f)
+                } else {
+                    f.write_char(*character)
+                }
+            }
         }
     }
 }
@@ -54,21 +65,48 @@ impl Canvas {
         loc: impl AsLocationTuple,
         display: impl Into<String>,
     ) -> &mut Canvas {
+        self.draw_styled_line(loc, display, None)
+    }
+
+    pub fn draw_styled_line(
+        &mut self,
+        loc: impl AsLocationTuple,
+        display: impl Into<String>,
+        style: Option<ContentStyle>,
+    ) -> &mut Canvas {
         let (c, l) = loc.as_loc_tuple();
         let string: String = display.into();
 
         for (offset, ch) in string.chars().enumerate() {
-            self.acquire_block((c as usize) + offset, l as usize, ch);
+            self.acquire_block((c as usize) + offset, l as usize, ch, style);
         }
 
         self
     }
 
     pub fn draw_char(&mut self, loc: impl AsLocationTuple, display: char) -> &mut Canvas {
+        self.draw_styled_char(loc, display, None)
+    }
+
+    pub fn draw_styled_char(
+        &mut self,
+        loc: impl AsLocationTuple,
+        display: char,
+        style: Option<ContentStyle>,
+    ) -> &mut Canvas {
         let (c, l) = loc.as_loc_tuple();
-        self.acquire_block(c as usize, l as usize, display);
+        self.acquire_block(c as usize, l as usize, display, style);
 
         self
+    }
+
+    pub fn draw_styled<D: Display>(
+        &mut self,
+        loc: impl AsLocationTuple,
+        content: impl Into<StyledContent<D>>,
+    ) -> &mut Canvas {
+        let content: StyledContent<D> = content.into();
+        self.draw_styled_line(loc, content.content().to_string(), Some(*content.style()))
     }
 
     pub fn clear_all(&mut self) -> &mut Canvas {
@@ -78,13 +116,18 @@ impl Canvas {
         self
     }
 
-    pub fn acquire_block(&mut self, c: usize, l: usize, new_char: char) {
-        self.table[l][c] = Block::Acquired(new_char)
+    pub fn acquire_block(
+        &mut self,
+        c: usize,
+        l: usize,
+        new_char: char,
+        style: Option<ContentStyle>,
+    ) {
+        self.table[l][c] = Block::Acquired {
+            style,
+            character: new_char,
+        };
     }
-
-    // pub fn clear_block(&mut self, c: usize, l: usize) {
-    //     self.table[l][c] = Block::Empty
-    // }
 
     fn detect_changes(&self) -> Vec<(usize, usize)> {
         let mut changes: Vec<(usize, usize)> = vec![];
@@ -108,5 +151,16 @@ impl Canvas {
 
         stdout.flush()?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crossterm::style::Stylize;
+
+    #[test]
+    fn test_name() {
+        let styled_text = "Hello World".red().on_white();
+        println!("{}", styled_text.to_string());
     }
 }
