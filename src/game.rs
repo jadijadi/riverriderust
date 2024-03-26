@@ -25,8 +25,7 @@ impl<'g> Game<'g> {
         self.events.push(event);
     }
 
-    #[allow(dead_code)]
-    pub fn add_timer(&mut self, timer: WorldTimer, on_elapsed: impl Fn(&mut World) + 'g) {
+    pub fn add_timer(&mut self, timer: WorldTimer, on_elapsed: impl Fn(String, &mut World) + 'g) {
         let is_repeat = timer.repeat;
         let key: String = Uuid::new_v4().to_string();
         self.world
@@ -35,9 +34,9 @@ impl<'g> Game<'g> {
             .get_mut()
             .insert(key.clone(), timer);
         self.add_event_handler(WorldEvent::new(
-            WorldEventTrigger::TimerElapsed(key),
+            WorldEventTrigger::TimerElapsed(key.clone()),
             is_repeat,
-            on_elapsed,
+            move |world| on_elapsed(key.clone(), world),
         ));
     }
 

@@ -167,15 +167,21 @@ impl<'g> World<'g> {
         }
     }
 
-    pub fn add_timer(&mut self, timer: WorldTimer, on_elapsed: impl Fn(&mut World) + 'g) {
+    pub fn add_timer(&mut self, timer: WorldTimer, on_elapsed: impl Fn(String, &mut World) + 'g) {
         let is_repeat = timer.repeat;
         let key: String = Uuid::new_v4().to_string();
         self.timers.get_mut().insert(key.clone(), timer);
         self.add_event_handler(WorldEvent::new(
-            WorldEventTrigger::TimerElapsed(key),
+            WorldEventTrigger::TimerElapsed(key.clone()),
             is_repeat,
-            on_elapsed,
+            move |world| on_elapsed(key.clone(), world),
         ));
+    }
+
+    pub fn reset_timer(&mut self, timer_key: &str) -> Option<bool> {
+        let timer = self.timers.get_mut().get_mut(timer_key)?;
+        timer.instant = Instant::now();
+        Some(true)
     }
 
     pub fn add_drawing(&mut self, key: impl Into<String>, drawing: impl Drawable + 'static) {
@@ -194,14 +200,14 @@ impl<'g> World<'g> {
         &mut self,
         message: impl Into<String>,
         duration: Duration,
-        after: impl Fn(&mut World) + 'g,
+        after: impl Fn(String, &mut World) + 'g,
         style: impl Into<Option<ContentStyle>>,
     ) {
         let key = Uuid::new_v4().to_string();
         self.add_drawing(&key, self.popup(message, style));
-        self.add_timer(WorldTimer::new(duration, false), move |w| {
+        self.add_timer(WorldTimer::new(duration, false), move |timer_key, w| {
             w.clear_drawing(&key);
-            after(w);
+            after(timer_key, w);
         });
     }
 } // end of World implementation.

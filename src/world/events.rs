@@ -229,32 +229,55 @@ impl<'g> Game<'g> {
         //      then go back to normal and increase enemies spawn chance.
         self.add_timer(
             WorldTimer::new(Duration::from_secs(60), true),
-            move |world| {
+            move |timer_key, world| {
                 world.map.change_river_mode(RiverMode::ConstWidthAndCenter {
                     width: world.maxc / 2,
                     center_c: world.maxc / 2,
                 });
 
                 world.temp_popup(
-                    "^ ^ ^",
+                    "More enemies ...",
                     Duration::from_secs(1),
-                    |world| {
+                    |_, _| {},
+                    ContentStyle::new().black().on_yellow(),
+                );
+
+                world.add_timer(
+                    WorldTimer::new(Duration::from_secs(10), false),
+                    move |_, world| {
+                        world.reset_timer(&timer_key);
                         if world.enemy_spawn_probability.value < 1.0 {
                             world.enemy_spawn_probability.value += 0.1;
                         }
                         world.map.restore_river_mode();
                     },
-                    ContentStyle::new().black().on_red(),
                 );
             },
         );
 
+        // Improve enemies armor by 1 every 60 (so difficult)
+        // self.add_timer(
+        //     WorldTimer::new(Duration::from_secs(60), true),
+        //     |_, world| {
+        //         world.temp_popup(
+        //             "Stronger enemies",
+        //             Duration::from_secs(1),
+        //             |_, _| {},
+        //             ContentStyle::new().black().on_red(),
+        //         );
+
+        //         world.enemies_armor += 1;
+        //     },
+        // );
+
         // Update elapsed time every 1 sec
-        self.add_timer(WorldTimer::new(Duration::from_secs(1), true), |world| {
+        self.add_timer(WorldTimer::new(Duration::from_secs(1), true), |_, world| {
             world.elapsed_time += 1;
         });
 
         // ---- Temporary events: Triggered on specified conditions (is_continues: false) ----
+
+        // Opening events and popups
         let style = ContentStyle::new().green().on_magenta();
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::GameStarted,
@@ -270,23 +293,23 @@ impl<'g> Game<'g> {
 
                 world.temp_popup(
                     "Warmup",
-                    Duration::from_secs(10),
-                    move |world| {
+                    Duration::from_secs(5),
+                    move |_, world| {
                         world.temp_popup(
                             "Ready !!",
                             Duration::from_secs(2),
-                            move |world| {
+                            move |_, world| {
                                 world.temp_popup(
                                     "!!! GO !!!",
                                     Duration::from_secs(1),
-                                    |world| {
+                                    |_, world| {
                                         world.map.restore_river_mode();
                                         world.fuel_spawn_probability.restore();
                                         world.enemy_spawn_probability.restore();
 
                                         world.add_timer(
                                             WorldTimer::new(Duration::from_secs(10), true),
-                                            |world| {
+                                            |_, world| {
                                                 world.player.score += 10;
                                             },
                                         );
