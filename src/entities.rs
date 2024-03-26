@@ -1,3 +1,5 @@
+use crate::utilities::stout_ext::AsLocationTuple;
+
 #[derive(PartialEq, Eq)]
 pub enum DeathCause {
     Enemy,
@@ -25,6 +27,11 @@ pub struct Location {
 }
 
 impl Location {
+    pub fn from_loc_tuple(loc: impl AsLocationTuple) -> Self {
+        let (c, l) = loc.as_loc_tuple();
+        Self::new(c, l)
+    }
+
     pub fn new(c: u16, l: u16) -> Self {
         Location { c, l }
     }
@@ -69,13 +76,15 @@ impl Location {
 pub struct Enemy {
     pub location: Location,
     pub status: EntityStatus,
+    pub armor: u16,
 }
 
 impl Enemy {
-    pub fn new(column: u16, line: u16, status: EntityStatus) -> Enemy {
+    pub fn new(loc: impl AsLocationTuple, armor: u16) -> Enemy {
         Enemy {
-            location: Location::new(column, line),
-            status,
+            location: Location::from_loc_tuple(loc),
+            status: EntityStatus::Alive,
+            armor,
         }
     }
 } // end of Enemy implementation.
@@ -86,9 +95,9 @@ pub struct Bullet {
 }
 
 impl Bullet {
-    pub fn new(column: u16, line: u16, energy: u16) -> Bullet {
+    pub fn new(loc: impl AsLocationTuple, energy: u16) -> Bullet {
         Bullet {
-            location: Location::new(column, line),
+            location: Location::from_loc_tuple(loc),
             energy,
         }
     }
@@ -100,9 +109,9 @@ pub struct Fuel {
 }
 
 impl Fuel {
-    pub fn new(column: u16, line: u16, status: EntityStatus) -> Fuel {
+    pub fn new(loc: impl AsLocationTuple, status: EntityStatus) -> Fuel {
         Fuel {
-            location: Location::new(column, line),
+            location: Location::from_loc_tuple(loc),
             status,
         }
     }
@@ -111,12 +120,22 @@ impl Fuel {
 pub struct Player {
     pub location: Location,
     pub status: PlayerStatus,
-    pub gas: u16,
+    pub fuel: u16,
     pub score: u16,
     pub traveled: u16,
 }
 
 impl Player {
+    pub fn new(loc: impl AsLocationTuple, fuel: u16) -> Self {
+        Self {
+            location: Location::from_loc_tuple(loc),
+            status: PlayerStatus::Alive,
+            fuel,
+            score: 0,
+            traveled: 0,
+        }
+    }
+
     pub fn go_up(&mut self) {
         self.traveled += 1;
         self.location = self.location.up()

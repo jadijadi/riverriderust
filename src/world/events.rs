@@ -24,7 +24,7 @@ fn check_player_status(world: &mut World) {
         world.player.status = PlayerStatus::Dead(DeathCause::Ground);
     }
 
-    if world.player.gas == 0 {
+    if world.player.fuel == 0 {
         world.player.status = PlayerStatus::Dead(DeathCause::Fuel);
     }
 }
@@ -49,8 +49,11 @@ fn check_enemy_status(world: &mut World) {
 
         for bullet in world.bullets.iter().rev() {
             if bullet.location.hit_with_margin(&enemy.location, 1, 0, 1, 0) {
-                enemy.status = EntityStatus::DeadBody;
-                world.player.score += 10;
+                enemy.armor -= 1;
+                if enemy.armor <= 0 {
+                    enemy.status = EntityStatus::DeadBody;
+                    world.player.score += 10;
+                }
             }
         }
     }
@@ -94,7 +97,7 @@ fn check_fuel_status(world: &mut World) {
         match fuel.status {
             EntityStatus::Alive if world.player.location.hit(&fuel.location) => {
                 fuel.status = EntityStatus::DeadBody;
-                world.player.gas += 200;
+                world.player.fuel += 200;
             }
             EntityStatus::DeadBody => {
                 fuel.status = EntityStatus::Dead;
@@ -115,10 +118,9 @@ fn check_fuel_status(world: &mut World) {
 fn create_fuel(world: &mut World) {
     // Possibility
     let river_border = world.map.river_borders_index(0);
-    if is_the_chance(world.fuel_spawn_probability) {
+    if is_the_chance(world.fuel_spawn_probability.value) {
         world.fuels.push(Fuel::new(
-            world.rng.gen_range(river_border),
-            0,
+            (world.rng.gen_range(river_border), 0),
             EntityStatus::Alive,
         ));
     }
@@ -128,11 +130,10 @@ fn create_fuel(world: &mut World) {
 fn create_enemy(world: &mut World) {
     // Possibility
     let river_border = world.map.river_borders_index(0);
-    if is_the_chance(world.enemy_spawn_probability) {
+    if is_the_chance(world.enemy_spawn_probability.value) {
         world.enemies.push(Enemy::new(
-            world.rng.gen_range(river_border),
-            0,
-            EntityStatus::Alive,
+            (world.rng.gen_range(river_border), 0),
+            world.enemies_armor,
         ));
     }
 }
@@ -209,8 +210,8 @@ impl<'g> Game<'g> {
             WorldEventTrigger::Anything,
             true,
             |world| {
-                if world.player.gas >= 1 {
-                    world.player.gas -= 1;
+                if world.player.fuel >= 1 {
+                    world.player.fuel -= 1;
                 }
             },
         ));
@@ -222,8 +223,6 @@ impl<'g> Game<'g> {
                 world.player.traveled += 1;
             },
         ));
-
-        let style = ContentStyle::new().green().on_magenta();
 
         // At this point it's very simple to add stages to the game, using events.
         // - This's an example: Every 60 sec move river to center
@@ -240,12 +239,12 @@ impl<'g> Game<'g> {
                     "^ ^ ^",
                     Duration::from_secs(1),
                     |world| {
-                        if world.enemy_spawn_probability < 1.0 {
-                            world.enemy_spawn_probability += 0.1;
+                        if world.enemy_spawn_probability.value < 1.0 {
+                            world.enemy_spawn_probability.value += 0.1;
                         }
                         world.map.restore_river_mode();
                     },
-                    style,
+                    ContentStyle::new().black().on_red(),
                 );
             },
         );
@@ -256,10 +255,14 @@ impl<'g> Game<'g> {
         });
 
         // ---- Temporary events: Triggered on specified conditions (is_continues: false) ----
+        let style = ContentStyle::new().green().on_magenta();
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::GameStarted,
             false,
             move |world| {
+                world.enemy_spawn_probability.value = 0.0;
+                world.fuel_spawn_probability.value = 0.0;
+
                 world.map.change_river_mode(RiverMode::ConstWidthAndCenter {
                     width: world.maxc / 2,
                     center_c: world.maxc / 2,
@@ -278,9 +281,8 @@ impl<'g> Game<'g> {
                                     Duration::from_secs(1),
                                     |world| {
                                         world.map.restore_river_mode();
-
-                                        world.fuel_spawn_probability = 0.01;
-                                        world.enemy_spawn_probability = 0.1;
+                                        world.fuel_spawn_probability.restore();
+                                        world.enemy_spawn_probability.restore();
 
                                         world.add_timer(
                                             WorldTimer::new(Duration::from_secs(10), true),

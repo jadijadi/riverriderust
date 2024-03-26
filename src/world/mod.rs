@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 use crate::{
     canvas::Canvas,
-    drawable::Drawable,
-    entities::{Bullet, Enemy, Fuel, Location, Player, PlayerStatus},
+    entities::{Bullet, Enemy, Fuel, Player},
+    utilities::{drawable::Drawable, restorable::Restorable},
 };
 
 use self::map::Map;
@@ -103,11 +103,11 @@ pub struct World<'g> {
     pub map: Map,
     pub maxc: u16,
     pub maxl: u16,
-    pub next_right: u16,
-    pub next_left: u16,
 
-    pub enemy_spawn_probability: f32,
-    pub fuel_spawn_probability: f32,
+    pub enemies_armor: u16,
+    pub enemy_spawn_probability: Restorable<f32>,
+    pub fuel_spawn_probability: Restorable<f32>,
+
     pub enemies: Vec<Enemy>,
     pub fuels: Vec<Fuel>,
     pub bullets: Vec<Bullet>,
@@ -129,26 +129,19 @@ impl<'g> World<'g> {
             elapsed_loops: 0,
             status: WorldStatus::Fluent,
             canvas: Canvas::new(maxc, maxl),
-            player: Player {
-                location: Location::new(maxc / 2, maxl - 1),
-                status: PlayerStatus::Alive,
-                score: 0,
-                gas: 1700,
-                traveled: 0,
-            },
+            player: Player::new((maxc / 2, maxl - 1), 1700),
             map: Map::new(maxc, maxl, 5, maxc / 3, 2, 5),
             maxc,
             maxl,
-            next_left: maxc / 2 - 7,
-            next_right: maxc / 2 + 7,
             enemies: Vec::new(),
             bullets: Vec::new(),
             fuels: Vec::new(),
             rng: thread_rng(),
             timers: RefCell::new(HashMap::new()),
             custom_drawings: HashMap::new(),
-            enemy_spawn_probability: 0.0,
-            fuel_spawn_probability: 0.0,
+            enemies_armor: 1,
+            enemy_spawn_probability: 0.1.into(),
+            fuel_spawn_probability: 0.01.into(),
             new_events: Vec::new(),
         }
     }

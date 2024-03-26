@@ -2,7 +2,7 @@ use std::{cmp::Ordering, collections::VecDeque};
 
 use rand::{rngs::ThreadRng, Rng};
 
-use crate::drawable::Drawable;
+use crate::utilities::{drawable::Drawable, restorable::Restorable};
 
 #[derive(Clone)]
 pub struct RiverPart {
@@ -18,7 +18,7 @@ impl RiverPart {
     pub fn from_map(map: &Map, rng: &mut ThreadRng) -> Self {
         use Ordering::*;
 
-        match map.river_mode {
+        match map.river_mode.value {
             RiverMode::Random {
                 min_width,
                 max_width,
@@ -95,8 +95,7 @@ pub enum RiverMode {
 pub struct Map {
     max_c: u16,
     max_l: u16,
-    river_mode: RiverMode,
-    river_mode_default: RiverMode,
+    river_mode: Restorable<RiverMode>,
     river_parts: VecDeque<RiverPart>,
     next_point: u16,
     change_rate: u16,
@@ -138,8 +137,7 @@ impl Map {
                 .map(|_| RiverPart::new(max_width, max_c / 2))
                 .collect(),
             change_rate,
-            river_mode: river_mode.clone(),
-            river_mode_default: river_mode,
+            river_mode: river_mode.into(),
             target_river: RiverPart::new(max_width, max_c / 2),
         }
     }
@@ -191,11 +189,11 @@ impl Map {
     }
 
     pub fn change_river_mode(&mut self, mode: RiverMode) {
-        self.river_mode = mode;
+        self.river_mode.value = mode;
     }
 
     pub fn restore_river_mode(&mut self) {
-        self.river_mode = self.river_mode_default.clone();
+        self.river_mode.restore()
     }
 
     pub fn front(&self) -> Option<&RiverPart> {

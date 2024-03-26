@@ -1,6 +1,6 @@
 use game::Game;
 use std::io::stdout;
-use stout_ext::StdoutExt;
+use utilities::stout_ext::StdoutExt;
 
 use crossterm::{
     cursor::{Hide, Show},
@@ -10,11 +10,10 @@ use crossterm::{
 use world::World;
 
 mod canvas;
-mod drawable;
 mod entities;
 mod events;
 mod game;
-mod stout_ext;
+mod utilities;
 mod world;
 
 fn main() -> std::io::Result<()> {

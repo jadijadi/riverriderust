@@ -5,7 +5,7 @@ use std::{
 
 use crossterm::style::{ContentStyle, StyledContent};
 
-use crate::{
+use crate::utilities::{
     drawable::Drawable,
     stout_ext::{AsLocationTuple, StdoutExt},
 };

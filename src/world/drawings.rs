@@ -11,10 +11,10 @@ use crossterm::{
 };
 
 use crate::{
-    drawable::Drawable,
     entities::{DeathCause, PlayerStatus},
     game::Game,
-    stout_ext::StdoutExt,
+    utilities::drawable::Drawable,
+    utilities::stout_ext::StdoutExt,
     World,
 };
 
@@ -117,7 +117,7 @@ impl<'g> Game<'g> {
         let events = self.events_len();
         let mut world = self.world.borrow_mut();
         let score = world.player.score;
-        let gas = world.player.gas / 100;
+        let fuel = (world.player.fuel as f32) / 100.0;
         let enemies = world.enemies.len();
         let traveled = world.player.traveled;
         let timers = world.timers.borrow().len();
@@ -126,7 +126,7 @@ impl<'g> Game<'g> {
         world
             .canvas
             .draw_line(2, format!(" Score: {} ", score))
-            .draw_line((2, 3), format!(" Fuel: {} ", gas / 100))
+            .draw_line((2, 3), format!(" Fuel: {} ", fuel))
             .draw_line((2, 4), format!(" Time: {}s ", elapsed_time))
             .draw_line((2, 5), format!(" Enemies: {} ", enemies))
             .draw_line((2, 6), format!(" Traveled: {} ", traveled))

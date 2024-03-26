@@ -56,11 +56,8 @@ pub fn handle_pressed_keys(world: &mut World) -> std::io::Result<()> {
                     }
                     KeyCode::Char(' ') => {
                         if world.player.status == PlayerStatus::Alive && world.bullets.is_empty() {
-                            let new_bullet = Bullet::new(
-                                world.player.location.c,
-                                world.player.location.l - 1,
-                                world.maxl / 4,
-                            );
+                            let new_bullet =
+                                Bullet::new(world.player.location.up(), world.maxl / 4);
                             world.bullets.push(new_bullet);
                         }
                     }
