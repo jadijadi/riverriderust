@@ -24,7 +24,7 @@ fn main() -> std::io::Result<()> {
     enable_raw_mode()?;
 
     // init the world
-    let slowness = 75;
+    let slowness = 80;
 
     let mut game = Game::new(maxc, maxl);
 

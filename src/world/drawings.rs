@@ -53,11 +53,11 @@ impl Drawable for PopupDrawing {
         let message_len_offset = (message_len / 2) as u16 + 4;
         let col = self.max_c / 2 - message_len_offset;
         let center_l = self.max_l / 2;
-        sc.draw_line((col, center_l - 2), line_0)
+        sc.draw_styled_line((col, center_l - 2), line_0, self.style)
             .draw_styled_line((col, center_l - 1), line_1, self.style)
             .draw_styled_line((col, center_l), line_2, self.style)
             .draw_styled_line((col, center_l + 1), line_3, self.style)
-            .draw_line((col, center_l + 2), line_4);
+            .draw_styled_line((col, center_l + 2), line_4, self.style);
     }
 }
 
@@ -67,7 +67,7 @@ impl<'g> World<'g> {
         message: impl Into<String>,
         style: impl Into<Option<ContentStyle>>,
     ) -> PopupDrawing {
-        PopupDrawing::new(self.maxc, self.maxl, message.into(), style)
+        PopupDrawing::new(self.max_c(), self.max_l(), message.into(), style)
     }
 
     pub fn draw_on_canvas(&mut self) {
@@ -140,13 +140,13 @@ impl<'g> Game<'g> {
         let welcome_msg: &str = "██████╗ ██╗██╗   ██╗███████╗██████╗ ██████╗  █████╗ ██╗██████╗     ██████╗ ██╗   ██╗███████╗████████╗\n\r██╔══██╗██║██║   ██║██╔════╝██╔══██╗██╔══██╗██╔══██╗██║██╔══██╗    ██╔══██╗██║   ██║██╔════╝╚══██╔══╝\n\r██████╔╝██║██║   ██║█████╗  ██████╔╝██████╔╝███████║██║██║  ██║    ██████╔╝██║   ██║███████╗   ██║   \n\r██╔══██╗██║╚██╗ ██╔╝██╔══╝  ██╔══██╗██╔══██╗██╔══██║██║██║  ██║    ██╔══██╗██║   ██║╚════██║   ██║   \n\r██║  ██║██║ ╚████╔╝ ███████╗██║  ██║██║  ██║██║  ██║██║██████╔╝    ██║  ██║╚██████╔╝███████║   ██║   \n\r╚═╝  ╚═╝╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═════╝     ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   \n";
         self.clear_screen(stdout)?;
 
-        if world.maxc > 100 {
+        if world.max_c() > 100 {
             stdout.draw((0, 2), welcome_msg)?;
         } else {
             stdout.draw((0, 2), "RiverRaid Rust")?;
         }
 
-        stdout.draw((2, world.maxl - 2), "Press any key to continue...")?;
+        stdout.draw((2, world.max_l() - 2), "Press any key to continue...")?;
         stdout.flush()?;
 
         loop {
@@ -170,25 +170,25 @@ impl<'g> Game<'g> {
             .draw((0, 2), goodbye_msg1)?
             .draw((0, 10), goodbye_msg2)?;
 
-        stdout.move_cursor((2, world.maxl - 5))?;
+        stdout.move_cursor((2, world.max_l() - 5))?;
         if let PlayerStatus::Dead(cause) = &world.player.status {
             match cause {
                 DeathCause::Ground => {
-                    if world.maxc > 91 {
+                    if world.max_c() > 91 {
                         stdout.print("\r█▄█ █▀█ █░█   █▀▀ █▀█ ▄▀█ █▀ █░█ █▀▀ █▀▄   █ █▄░█   ▀█▀ █░█ █▀▀   █▀▀ █▀█ █▀█ █░█ █▄░█ █▀▄ ░\n\r░█░ █▄█ █▄█   █▄▄ █▀▄ █▀█ ▄█ █▀█ ██▄ █▄▀   █ █░▀█   ░█░ █▀█ ██▄   █▄█ █▀▄ █▄█ █▄█ █░▀█ █▄▀ ▄\n\r")?;
                     } else {
                         stdout.print("You crashed in the ground.")?;
                     }
                 }
                 DeathCause::Enemy => {
-                    if world.maxc > 72 {
+                    if world.max_c() > 72 {
                         stdout.print("\r▄▀█ █▄░█   █▀▀ █▄░█ █▀▀ █▀▄▀█ █▄█   █▄▀ █ █░░ █░░ █▀▀ █▀▄   █▄█ █▀█ █░█ ░\n\r█▀█ █░▀█   ██▄ █░▀█ ██▄ █░▀░█ ░█░   █░█ █ █▄▄ █▄▄ ██▄ █▄▀   ░█░ █▄█ █▄█ ▄\n\r")?;
                     } else {
                         stdout.print("An enemy killed you.")?;
                     }
                 }
                 DeathCause::Fuel => {
-                    if world.maxc > 69 {
+                    if world.max_c() > 69 {
                         stdout.print("\r█▄█ █▀█ █░█   █▀█ ▄▀█ █▄░█   █▀█ █░█ ▀█▀   █▀█ █▀▀   █▀▀ █░█ █▀▀ █░░ ░\n\r░█░ █▄█ █▄█   █▀▄ █▀█ █░▀█   █▄█ █▄█ ░█░   █▄█ █▀░   █▀░ █▄█ ██▄ █▄▄ ▄\n\r")?;
                     } else {
                         stdout.print("You ran out of fuel.")?;
@@ -202,7 +202,7 @@ impl<'g> Game<'g> {
             }
         }
 
-        stdout.move_cursor((2, world.maxl - 2))?;
+        stdout.move_cursor((2, world.max_l() - 2))?;
         thread::sleep(Duration::from_millis(2000));
         stdout.print("Press any key to continue...")?;
         stdout.flush()?;

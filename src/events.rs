@@ -22,27 +22,27 @@ pub fn handle_pressed_keys(world: &mut World) -> std::io::Result<()> {
                     // Movements
                     KeyCode::Char('w') | KeyCode::Up
                         if world.player.status == PlayerStatus::Alive
-                            && world.player.location.l > 1 =>
+                            && world.player.location.line > 1 =>
                     {
-                        world.player.go_up()
+                        world.player.go_up();
                     }
                     KeyCode::Char('s') | KeyCode::Down
                         if world.player.status == PlayerStatus::Alive
-                            && world.player.location.l < world.maxl - 1 =>
+                            && world.player.location.line < world.max_l() - 1 =>
                     {
-                        world.player.go_down()
+                        world.player.go_down();
                     }
                     KeyCode::Char('a') | KeyCode::Left
                         if world.player.status == PlayerStatus::Alive
-                            && world.player.location.c > 1 =>
+                            && world.player.location.column > 1 =>
                     {
-                        world.player.go_left()
+                        world.player.go_left();
                     }
                     KeyCode::Char('d') | KeyCode::Right
                         if world.player.status == PlayerStatus::Alive
-                            && world.player.location.c < world.maxc - 1 =>
+                            && world.player.location.column < world.max_c() - 1 =>
                     {
-                        world.player.go_right()
+                        world.player.go_right();
                     }
 
                     // Other events
@@ -50,14 +50,13 @@ pub fn handle_pressed_keys(world: &mut World) -> std::io::Result<()> {
                     KeyCode::Char('p') if event.kind == KeyEventKind::Press => {
                         use crate::world::WorldStatus::*;
                         world.status = match world.status {
-                            Fluent => Paused,
-                            Paused => Fluent,
+                            Fluent => Solid,
+                            Solid => Fluent,
                         };
                     }
-                    KeyCode::Char(' ') => {
+                    KeyCode::Char(' ') if event.kind == KeyEventKind::Press => {
                         if world.player.status == PlayerStatus::Alive && world.bullets.is_empty() {
-                            let new_bullet =
-                                Bullet::new(world.player.location.up(), world.maxl / 4);
+                            let new_bullet = Bullet::new(&world.player.location, world.max_l() / 4);
                             world.bullets.push(new_bullet);
                         }
                     }

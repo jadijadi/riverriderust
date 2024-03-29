@@ -16,12 +16,10 @@ fn is_the_chance(probability: f32) -> bool {
 }
 
 /// check if player hit the ground
-fn check_player_status(world: &mut World) {
-    let player_line = world.player.location.l as usize;
-    let river_border = world.map.river_borders_index(player_line);
-
-    if !river_border.contains(&world.player.location.c) {
+fn update_player_status(world: &mut World) {
+    if !world.map.is_in_river(&world.player) {
         world.player.status = PlayerStatus::Dead(DeathCause::Ground);
+        return;
     }
 
     if world.player.fuel == 0 {
@@ -30,7 +28,7 @@ fn check_player_status(world: &mut World) {
 }
 
 /// check enemy hit something
-fn check_enemy_status(world: &mut World) {
+fn update_enemy_status(world: &mut World) {
     // Remove dead
     world
         .enemies
@@ -62,28 +60,24 @@ fn check_enemy_status(world: &mut World) {
 /// Move enemies on the river
 fn move_enemies(world: &mut World) {
     world.enemies.retain_mut(|enemy| {
-        enemy.location.l += 1;
+        enemy.location.go_down();
         // Retain enemies within the screen
-        enemy.location.l < world.maxl
+        world.container.is_upper_loc(enemy)
     });
 }
 
 /// Move Bullets
 fn move_bullets(world: &mut World) {
-    for index in (0..world.bullets.len()).rev() {
-        if world.bullets[index].energy == 0 || world.bullets[index].location.l <= 2 {
-            world.bullets.remove(index);
+    world.bullets.retain_mut(|bullet| {
+        if bullet.energy == 0 || bullet.location.line < 2 {
+            false
         } else {
-            world.bullets[index].location.l -= 2;
-            world.bullets[index].energy -= 1;
+            bullet.location.go_up().go_up();
+            bullet.energy -= 1;
 
-            let bullet_line = world.bullets[index].location.l as usize;
-            let river_border = world.map.river_borders_index(bullet_line);
-            if !river_border.contains(&world.bullets[index].location.c) {
-                world.bullets.remove(index);
-            }
+            world.map.is_in_river(bullet)
         }
-    }
+    })
 }
 
 /// check if fuel is hit / moved over
@@ -117,7 +111,7 @@ fn check_fuel_status(world: &mut World) {
 /// Create a new fuel; maybe
 fn create_fuel(world: &mut World) {
     // Possibility
-    let river_border = world.map.river_borders_index(0);
+    let river_border = world.map.river_borders_at(0);
     if is_the_chance(world.fuel_spawn_probability.value) {
         world.fuels.push(Fuel::new(
             (world.rng.gen_range(river_border), 0),
@@ -129,7 +123,7 @@ fn create_fuel(world: &mut World) {
 /// Create a new enemy
 fn create_enemy(world: &mut World) {
     // Possibility
-    let river_border = world.map.river_borders_index(0);
+    let river_border = world.map.river_borders_at(0);
     if is_the_chance(world.enemy_spawn_probability.value) {
         world.enemies.push(Enemy::new(
             (world.rng.gen_range(river_border), 0),
@@ -141,9 +135,9 @@ fn create_enemy(world: &mut World) {
 /// Move fuels on the river
 fn move_fuel(world: &mut World) {
     world.fuels.retain_mut(|fuel| {
-        fuel.location.l += 1;
+        fuel.location.go_down();
         // Retain fuels within the screen
-        fuel.location.l < world.maxl
+        world.container.is_upper_loc(fuel)
     });
 }
 
@@ -154,15 +148,16 @@ impl<'g> Game<'g> {
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            check_player_status,
+            update_player_status,
         ));
 
         // check enemy hit something
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            check_enemy_status,
+            update_enemy_status,
         ));
+
         self.add_event_handler(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
@@ -231,8 +226,8 @@ impl<'g> Game<'g> {
             WorldTimer::new(Duration::from_secs(60), true),
             move |timer_key, world| {
                 world.map.change_river_mode(RiverMode::ConstWidthAndCenter {
-                    width: world.maxc / 2,
-                    center_c: world.maxc / 2,
+                    width: world.max_c() / 3,
+                    center_c: world.max_c() / 2,
                 });
 
                 world.temp_popup(
@@ -287,8 +282,8 @@ impl<'g> Game<'g> {
                 world.fuel_spawn_probability.value = 0.0;
 
                 world.map.change_river_mode(RiverMode::ConstWidthAndCenter {
-                    width: world.maxc / 2,
-                    center_c: world.maxc / 2,
+                    width: world.max_c() / 2,
+                    center_c: world.max_c() / 2,
                 });
 
                 world.temp_popup(

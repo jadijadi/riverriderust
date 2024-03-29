@@ -68,7 +68,7 @@ impl<'g> Game<'g> {
                     self.world.borrow_mut().draw_on_canvas();
                     self.draw_status();
                 }
-                WorldStatus::Paused => self.world.borrow_mut().pause_screen(),
+                WorldStatus::Solid => self.world.borrow_mut().pause_screen(),
             }
 
             // Draw canvas map into stdout.
