@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::{
     canvas::Canvas,
-    entities::{Bullet, Enemy, Fuel, Player},
+    entities::{Entity, Player},
     utilities::{container::Container, drawable::Drawable, restorable::Restorable},
 };
 
@@ -107,9 +107,10 @@ pub struct World<'g> {
     pub enemy_spawn_probability: Restorable<f32>,
     pub fuel_spawn_probability: Restorable<f32>,
 
-    pub enemies: Vec<Enemy>,
-    pub fuels: Vec<Fuel>,
-    pub bullets: Vec<Bullet>,
+    // pub enemies: Vec<Enemy>,
+    // pub fuels: Vec<Fuel>,
+    // pub bullets: Vec<Bullet>,
+    pub entities: Vec<Entity>,
     pub rng: ThreadRng, // Local rng for the whole world
 
     pub elapsed_time: usize,
@@ -131,9 +132,9 @@ impl<'g> World<'g> {
             player: Player::new((maxc / 2, maxl - 1), 1700),
             map: Map::new(maxc, maxl, 5, maxc / 3, 2, 5),
             container: Container::new(0..maxl, 0..maxc),
-            enemies: Vec::new(),
-            bullets: Vec::new(),
-            fuels: Vec::new(),
+            // enemies: Vec::new(),
+            // fuels: Vec::new(),
+            entities: Vec::new(),
             rng: thread_rng(),
             timers: RefCell::new(HashMap::new()),
             custom_drawings: HashMap::new(),
@@ -150,6 +151,10 @@ impl<'g> World<'g> {
 
     pub fn max_c(&self) -> u16 {
         self.container.columns().end
+    }
+
+    pub fn enemies(&self) -> impl Iterator<Item = &Entity> {
+        self.entities.iter().filter(|e| e.entity_type.is_enemy())
     }
 
     pub fn timer_elapsed(&self, key: &str) -> Option<bool> {

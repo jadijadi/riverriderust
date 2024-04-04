@@ -42,7 +42,7 @@ impl PopupDrawing {
 }
 
 impl Drawable for PopupDrawing {
-    fn draw(&self, sc: &mut crate::canvas::Canvas) {
+    fn draw_on_canvas(&self, sc: &mut crate::canvas::Canvas) {
         let message_len = self.message.len();
         let line_0 = format!("    {}    ", " ".repeat(message_len));
         let line_1 = format!("  ╔═{}═╗  ", "═".repeat(message_len));
@@ -76,27 +76,15 @@ impl<'g> World<'g> {
         // draw the map
         self.canvas.draw(&self.map);
 
-        // draw fuel
-        for fuel in self.fuels.iter() {
-            self.canvas.draw(fuel);
+        for entity in self.entities.iter() {
+            self.canvas.draw(entity);
         }
 
-        // draw enemies
-        for enemy in self.enemies.iter() {
-            self.canvas.draw(enemy);
-        }
-
-        // draw bullet
-        for bullet in &self.bullets {
-            self.canvas.draw(bullet);
-        }
-
-        // draw the player
         self.canvas.draw(&self.player);
 
         for (_, drawing) in self.custom_drawings.iter() {
             let drawing: &dyn Drawable = drawing.borrow();
-            drawing.draw(&mut self.canvas);
+            drawing.draw_on_canvas(&mut self.canvas);
         }
     }
 
@@ -116,10 +104,11 @@ impl<'g> Game<'g> {
     pub fn draw_status(&self) {
         let events = self.events_len();
         let mut world = self.world.borrow_mut();
-        let score = world.player.score;
-        let fuel = (world.player.fuel as f32) / 100.0;
-        let enemies = world.enemies.len();
-        let traveled = world.player.traveled;
+        let player = &world.player;
+        let score = player.score;
+        let fuel = (player.fuel as f32) / 100.0;
+        let enemies = world.enemies().fold(0, |acc, _| acc + 1);
+        let traveled = player.traveled;
         let timers = world.timers.borrow().len();
         let elapsed_time = world.elapsed_time;
 

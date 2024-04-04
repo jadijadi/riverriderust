@@ -56,7 +56,7 @@ impl Canvas {
     }
 
     pub fn draw(&mut self, drawable: &impl Drawable) -> &mut Canvas {
-        drawable.draw(self);
+        drawable.draw_on_canvas(self);
         self
     }
 

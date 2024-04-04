@@ -103,7 +103,7 @@ pub struct Map {
 }
 
 impl Drawable for Map {
-    fn draw(&self, sc: &mut crate::canvas::Canvas) {
+    fn draw_on_canvas(&self, sc: &mut crate::canvas::Canvas) {
         for (line, part) in self.river_parts.iter().enumerate() {
             let border_range = self.river_borders(part);
             let (left_b, right_b) = (border_range.start, border_range.end);

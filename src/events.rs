@@ -17,7 +17,7 @@ pub fn handle_pressed_keys(world: &mut World) -> std::io::Result<()> {
 
         match key {
             Event::Key(event) => {
-                // I'm reading from keyboard into event
+                // I'm reading from keyboard into event;
                 match event.code {
                     // Movements
                     KeyCode::Char('w') | KeyCode::Up
@@ -55,9 +55,13 @@ pub fn handle_pressed_keys(world: &mut World) -> std::io::Result<()> {
                         };
                     }
                     KeyCode::Char(' ') if event.kind == KeyEventKind::Press => {
-                        if world.player.status == PlayerStatus::Alive && world.bullets.is_empty() {
-                            let new_bullet = Bullet::new(&world.player.location, world.max_l() / 4);
-                            world.bullets.push(new_bullet);
+                        if world.player.status == PlayerStatus::Alive
+                            && world.player.bullets.is_empty()
+                        {
+                            world
+                                .player
+                                .bullets
+                                .push(Bullet::new(&world.player.location, world.max_l() / 4));
                         }
                     }
                     _ => {}

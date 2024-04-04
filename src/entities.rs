@@ -14,6 +14,7 @@ pub enum PlayerStatus {
     Quit,
 }
 
+#[derive(PartialEq, Eq)]
 pub enum EntityStatus {
     Alive,
     DeadBody,
@@ -124,54 +125,101 @@ impl Location {
 } // end of Location implementation.
 
 pub struct Enemy {
-    pub location: Location,
-    pub status: EntityStatus,
     pub armor: u16,
 }
 
-impl_located!(Enemy);
-
 impl Enemy {
-    pub fn new(loc: impl AsLocationTuple, armor: u16) -> Enemy {
-        Enemy {
-            location: Location::from_loc_tuple(loc),
-            status: EntityStatus::Alive,
-            armor,
-        }
+    pub fn new(armor: u16) -> Enemy {
+        Enemy { armor }
     }
-} // end of Enemy implementation.
+}
+
+impl From<Enemy> for EntityType {
+    fn from(value: Enemy) -> Self {
+        EntityType::Enemy(value)
+    }
+}
 
 pub struct Bullet {
-    pub location: Location,
     pub energy: u16,
+    pub location: Location,
+}
+
+impl Bullet {
+    pub fn new(loc: impl AsLocationTuple, energy: u16) -> Self {
+        Self {
+            energy,
+            location: Location::from_loc_tuple(loc),
+        }
+    }
 }
 
 impl_located!(Bullet);
 
-impl Bullet {
-    pub fn new(loc: impl AsLocationTuple, energy: u16) -> Bullet {
-        Bullet {
-            location: Location::from_loc_tuple(loc),
-            energy,
-        }
-    }
-} // end of Bullet implementation.
+pub struct Fuel;
 
-pub struct Fuel {
-    pub location: Location,
-    pub status: EntityStatus,
+impl From<Fuel> for EntityType {
+    fn from(value: Fuel) -> Self {
+        EntityType::Fuel(value)
+    }
 }
 
-impl_located!(Fuel);
+pub enum EntityType {
+    Enemy(Enemy),
+    Fuel(Fuel),
+}
 
-impl Fuel {
-    pub fn new(loc: impl AsLocationTuple, status: EntityStatus) -> Fuel {
-        Fuel {
-            location: Location::from_loc_tuple(loc),
-            status,
+impl EntityType {
+    /// Returns `true` if the entity type is [`Fuel`].
+    ///
+    /// [`Fuel`]: EntityType::Fuel
+    #[must_use]
+    pub fn is_fuel(&self) -> bool {
+        matches!(self, Self::Fuel(..))
+    }
+
+    /// Returns `true` if the entity type is [`Enemy`].
+    ///
+    /// [`Enemy`]: EntityType::Enemy
+    #[must_use]
+    pub fn is_enemy(&self) -> bool {
+        matches!(self, Self::Enemy(..))
+    }
+
+    pub fn as_fuel(&self) -> Option<&Fuel> {
+        if let Self::Fuel(v) = self {
+            Some(v)
+        } else {
+            None
         }
     }
-} // end of Fuel implementation.
+
+    pub fn as_enemy(&self) -> Option<&Enemy> {
+        if let Self::Enemy(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+}
+
+pub struct Entity {
+    pub location: Location,
+    pub status: EntityStatus,
+    pub entity_type: EntityType,
+}
+
+impl Entity {
+    pub fn new(loc: impl AsLocationTuple, entity_type: impl Into<EntityType>) -> Self {
+        Self {
+            status: EntityStatus::Alive,
+            location: Location::from_loc_tuple(loc),
+            entity_type: entity_type.into(),
+        }
+    }
+}
+
+impl_located!(Entity);
 
 pub struct Player {
     pub location: Location,
@@ -179,9 +227,9 @@ pub struct Player {
     pub fuel: u16,
     pub score: u16,
     pub traveled: u16,
-}
 
-impl_located!(Player);
+    pub bullets: Vec<Bullet>,
+}
 
 impl Player {
     pub fn new(loc: impl AsLocationTuple, fuel: u16) -> Self {
@@ -191,15 +239,19 @@ impl Player {
             fuel,
             score: 0,
             traveled: 0,
+
+            bullets: Vec::new(),
         }
     }
 
     pub fn go_up(&mut self) -> &mut Location {
+        // Must not be here
         self.traveled += 1;
         self.location.go_up()
     }
 
     pub fn go_down(&mut self) -> &mut Location {
+        // Must not be here
         self.traveled -= 1;
         self.location.go_down()
     }
@@ -212,6 +264,8 @@ impl Player {
         self.location.go_right()
     }
 }
+
+impl_located!(Player);
 
 macro_rules! impl_located {
     ($tp: ident) => {
