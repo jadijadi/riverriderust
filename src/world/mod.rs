@@ -107,9 +107,6 @@ pub struct World<'g> {
     pub enemy_spawn_probability: Restorable<f32>,
     pub fuel_spawn_probability: Restorable<f32>,
 
-    // pub enemies: Vec<Enemy>,
-    // pub fuels: Vec<Fuel>,
-    // pub bullets: Vec<Bullet>,
     pub entities: Vec<Entity>,
     pub rng: ThreadRng, // Local rng for the whole world
 
@@ -132,8 +129,6 @@ impl<'g> World<'g> {
             player: Player::new((maxc / 2, maxl - 1), 1700),
             map: Map::new(maxc, maxl, 5, maxc / 3, 2, 5),
             container: Container::new(0..maxl, 0..maxc),
-            // enemies: Vec::new(),
-            // fuels: Vec::new(),
             entities: Vec::new(),
             rng: thread_rng(),
             timers: RefCell::new(HashMap::new()),

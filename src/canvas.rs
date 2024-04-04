@@ -84,6 +84,7 @@ impl Canvas {
         self
     }
 
+    #[allow(dead_code)]
     pub fn draw_char(&mut self, loc: impl AsLocationTuple, display: char) -> &mut Canvas {
         self.draw_styled_char(loc, display, None)
     }

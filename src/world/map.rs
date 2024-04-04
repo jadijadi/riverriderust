@@ -2,7 +2,7 @@ use std::{cmp::Ordering, collections::VecDeque};
 
 use rand::{rngs::ThreadRng, Rng};
 
-use crate::utilities::{drawable::Drawable, restorable::Restorable, stout_ext::AsLocationTuple};
+use crate::utilities::{restorable::Restorable, stout_ext::AsLocationTuple};
 
 #[derive(Clone)]
 pub struct RiverPart {
@@ -93,30 +93,13 @@ pub enum RiverMode {
 }
 
 pub struct Map {
-    max_c: u16,
-    max_l: u16,
+    pub max_c: u16,
+    pub max_l: u16,
     river_mode: Restorable<RiverMode>,
     river_parts: VecDeque<RiverPart>,
     next_point: u16,
     change_rate: u16,
     target_river: RiverPart,
-}
-
-impl Drawable for Map {
-    fn draw_on_canvas(&self, sc: &mut crate::canvas::Canvas) {
-        for (line, part) in self.river_parts.iter().enumerate() {
-            let border_range = self.river_borders(part);
-            let (left_b, right_b) = (border_range.start, border_range.end);
-
-            let line: u16 = line as u16;
-            sc.draw_line((0, line), "+".repeat(left_b.into()))
-                // .draw_line(
-                //     (left_b, line),
-                //     " ".repeat((right_b - left_b) as usize).on_blue(),
-                // )
-                .draw_line((right_b, line), "+".repeat((self.max_c - right_b) as usize));
-        }
-    }
 }
 
 impl Map {
@@ -207,6 +190,10 @@ impl Map {
 
     pub fn front(&self) -> Option<&RiverPart> {
         self.river_parts.front()
+    }
+
+    pub fn river_parts(&self) -> &VecDeque<RiverPart> {
+        &self.river_parts
     }
 }
 
