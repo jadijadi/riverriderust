@@ -2,7 +2,7 @@ use std::{cmp::Ordering, collections::VecDeque};
 
 use rand::{rngs::ThreadRng, Rng};
 
-use crate::utilities::{drawable::Drawable, restorable::Restorable};
+use crate::utilities::{drawable::Drawable, restorable::Restorable, stout_ext::AsLocationTuple};
 
 #[derive(Clone)]
 pub struct RiverPart {
@@ -103,13 +103,17 @@ pub struct Map {
 }
 
 impl Drawable for Map {
-    fn draw(&self, sc: &mut crate::canvas::Canvas) {
+    fn draw_on_canvas(&self, sc: &mut crate::canvas::Canvas) {
         for (line, part) in self.river_parts.iter().enumerate() {
             let border_range = self.river_borders(part);
             let (left_b, right_b) = (border_range.start, border_range.end);
 
             let line: u16 = line as u16;
             sc.draw_line((0, line), "+".repeat(left_b.into()))
+                // .draw_line(
+                //     (left_b, line),
+                //     " ".repeat((right_b - left_b) as usize).on_blue(),
+                // )
                 .draw_line((right_b, line), "+".repeat((self.max_c - right_b) as usize));
         }
     }
@@ -161,7 +165,12 @@ impl Map {
         RiverPart::from_map(self, rng)
     }
 
-    pub fn river_borders_index(&self, line: usize) -> std::ops::Range<u16> {
+    pub fn is_in_river(&self, loc: impl AsLocationTuple) -> bool {
+        let (column, line) = loc.as_loc_tuple();
+        self.river_borders_at(line as usize).contains(&column)
+    }
+
+    pub fn river_borders_at(&self, line: usize) -> std::ops::Range<u16> {
         self.river_borders(&self.river_parts[line])
     }
 

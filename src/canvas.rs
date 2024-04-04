@@ -56,7 +56,7 @@ impl Canvas {
     }
 
     pub fn draw(&mut self, drawable: &impl Drawable) -> &mut Canvas {
-        drawable.draw(self);
+        drawable.draw_on_canvas(self);
         self
     }
 
@@ -72,7 +72,7 @@ impl Canvas {
         &mut self,
         loc: impl AsLocationTuple,
         display: impl Into<String>,
-        style: Option<ContentStyle>,
+        style: impl Into<Option<ContentStyle>> + Copy,
     ) -> &mut Canvas {
         let (c, l) = loc.as_loc_tuple();
         let string: String = display.into();
@@ -92,7 +92,7 @@ impl Canvas {
         &mut self,
         loc: impl AsLocationTuple,
         display: char,
-        style: Option<ContentStyle>,
+        style: impl Into<Option<ContentStyle>>,
     ) -> &mut Canvas {
         let (c, l) = loc.as_loc_tuple();
         self.acquire_block(c as usize, l as usize, display, style);
@@ -121,10 +121,10 @@ impl Canvas {
         c: usize,
         l: usize,
         new_char: char,
-        style: Option<ContentStyle>,
+        style: impl Into<Option<ContentStyle>>,
     ) {
         self.table[l][c] = Block::Acquired {
-            style,
+            style: style.into(),
             character: new_char,
         };
     }

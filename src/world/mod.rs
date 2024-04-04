@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    time::{self, Duration, Instant},
+    time::{Duration, Instant},
 };
 
 use crossterm::style::ContentStyle;
@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 use crate::{
     canvas::Canvas,
-    entities::{Bullet, Enemy, Fuel, Player},
-    utilities::{drawable::Drawable, restorable::Restorable},
+    entities::{Entity, Player},
+    utilities::{container::Container, drawable::Drawable, restorable::Restorable},
 };
 
 use self::map::Map;
@@ -23,7 +23,7 @@ pub mod map;
 pub struct WorldTimer {
     pub duration: Duration,
     pub repeat: bool,
-    pub instant: time::Instant,
+    pub instant: Instant,
 }
 
 impl WorldTimer {
@@ -31,7 +31,7 @@ impl WorldTimer {
         Self {
             repeat,
             duration,
-            instant: time::Instant::now(),
+            instant: Instant::now(),
         }
     }
 }
@@ -39,27 +39,27 @@ impl WorldTimer {
 #[derive(Clone, Copy)]
 pub enum WorldStatus {
     Fluent,
-    Paused,
+    Solid,
 }
 
 #[allow(dead_code)]
-pub enum WorldEventTrigger {
+pub enum WorldEventTrigger<'g> {
     GameStarted,
     Anything,
     Traveled(u16),
     TimerElapsed(String),
     DrawingExists(String),
-    Custom(Box<dyn Fn(&World) -> bool>),
+    Custom(Box<dyn Fn(&World) -> bool + 'g>),
 }
 
-impl WorldEventTrigger {
+impl<'g> WorldEventTrigger<'g> {
     #[allow(dead_code)]
     pub fn timer_elapsed(timer_key: impl Into<String>) -> Self {
         Self::TimerElapsed(timer_key.into())
     }
 
     #[allow(dead_code)]
-    pub fn custom(trigger: impl Fn(&World) -> bool + 'static) -> Self {
+    pub fn custom(trigger: impl Fn(&World) -> bool + 'g) -> Self {
         Self::Custom(Box::new(trigger))
     }
 
@@ -76,7 +76,7 @@ impl WorldEventTrigger {
 }
 
 pub struct WorldEvent<'g> {
-    pub trigger: WorldEventTrigger,
+    pub trigger: WorldEventTrigger<'g>,
     pub is_continues: bool,
     pub handler: Box<dyn Fn(&mut World) + 'g>,
 }
@@ -84,7 +84,7 @@ pub struct WorldEvent<'g> {
 impl<'g> WorldEvent<'g> {
     /// Will create a continues event handler.
     pub fn new(
-        trigger: WorldEventTrigger,
+        trigger: WorldEventTrigger<'g>,
         is_continues: bool,
         handler: impl Fn(&mut World) + 'g,
     ) -> Self {
@@ -101,16 +101,16 @@ pub struct World<'g> {
     pub status: WorldStatus,
     pub player: Player,
     pub map: Map,
-    pub maxc: u16,
-    pub maxl: u16,
+    pub container: Container<u16>,
 
     pub enemies_armor: u16,
     pub enemy_spawn_probability: Restorable<f32>,
     pub fuel_spawn_probability: Restorable<f32>,
 
-    pub enemies: Vec<Enemy>,
-    pub fuels: Vec<Fuel>,
-    pub bullets: Vec<Bullet>,
+    // pub enemies: Vec<Enemy>,
+    // pub fuels: Vec<Fuel>,
+    // pub bullets: Vec<Bullet>,
+    pub entities: Vec<Entity>,
     pub rng: ThreadRng, // Local rng for the whole world
 
     pub elapsed_time: usize,
@@ -131,11 +131,10 @@ impl<'g> World<'g> {
             canvas: Canvas::new(maxc, maxl),
             player: Player::new((maxc / 2, maxl - 1), 1700),
             map: Map::new(maxc, maxl, 5, maxc / 3, 2, 5),
-            maxc,
-            maxl,
-            enemies: Vec::new(),
-            bullets: Vec::new(),
-            fuels: Vec::new(),
+            container: Container::new(0..maxl, 0..maxc),
+            // enemies: Vec::new(),
+            // fuels: Vec::new(),
+            entities: Vec::new(),
             rng: thread_rng(),
             timers: RefCell::new(HashMap::new()),
             custom_drawings: HashMap::new(),
@@ -144,6 +143,18 @@ impl<'g> World<'g> {
             fuel_spawn_probability: 0.01.into(),
             new_events: Vec::new(),
         }
+    }
+
+    pub fn max_l(&self) -> u16 {
+        self.container.lines().end
+    }
+
+    pub fn max_c(&self) -> u16 {
+        self.container.columns().end
+    }
+
+    pub fn enemies(&self) -> impl Iterator<Item = &Entity> {
+        self.entities.iter().filter(|e| e.entity_type.is_enemy())
     }
 
     pub fn timer_elapsed(&self, key: &str) -> Option<bool> {
