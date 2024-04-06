@@ -261,6 +261,27 @@ impl<'g> Game<'g> {
                     center_c: world.max_c() / 2,
                 });
 
+                // TODO: Something like (v) this is better
+                // world.popup_series(
+                //     [
+                //         ("Warmup".to_string(), Duration::from_secs(5), style),
+                //         ("Ready !!".to_string(), Duration::from_secs(2), style),
+                //         ("!!! GO !!!".to_string(), Duration::from_secs(1), style),
+                //     ],
+                //     |world: &mut World| {
+                //         world.map.restore_river_mode();
+                //         world.fuel_spawn_probability.restore();
+                //         world.enemy_spawn_probability.restore();
+
+                //         world.add_timer(
+                //             WorldTimer::new(Duration::from_secs(10), true),
+                //             |_, world: &mut World| {
+                //                 world.player.score += 10;
+                //             },
+                //         );
+                //     },
+                // );
+
                 world.temp_popup(
                     "Warmup",
                     Duration::from_secs(5),

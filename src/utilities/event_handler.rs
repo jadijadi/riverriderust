@@ -113,6 +113,14 @@ pub trait IntoTimerEventHandler<'g, Params> {
     }
 }
 
+impl<'g> IntoTimerEventHandler<'g, ()> for EventHandler<'g> {
+    fn into_timer_event_handler(self) -> TimerEventHandler<'g> {
+        TimerEventHandler {
+            handler: Box::new(move |_, world: &mut World| self.handle(world)),
+        }
+    }
+}
+
 impl<'g> IntoTimerEventHandler<'g, ()> for TimerEventHandler<'g> {
     fn into_timer_event_handler(self) -> TimerEventHandler<'g> {
         self
