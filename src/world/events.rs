@@ -6,9 +6,13 @@ use rand::Rng;
 use crate::{
     entities::{DeathCause, Enemy, Entity, EntityStatus, EntityType, Fuel, PlayerStatus},
     game::Game,
+    utilities::event_handler::{EventHandler, LeaveAlone, TimerEventHandler},
 };
 
-use super::{map::RiverMode, World, WorldEvent, WorldEventTrigger, WorldTimer};
+use super::{
+    map::{MapUpdater, RiverMode},
+    World, WorldEvent, WorldEventTrigger, WorldTimer,
+};
 
 fn is_the_chance(probability: f32) -> bool {
     let mut rng = rand::thread_rng();
@@ -128,59 +132,60 @@ impl<'g> Game<'g> {
     pub fn setup_event_handlers(&mut self) {
         // ---- Permanent event, running on every loop (is_continues: true) ----
         // check if player hit the ground
-        self.add_event_handler(WorldEvent::new(
+        self.add_event(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
             update_player_status,
         ));
 
         // check enemy hit something
-        self.add_event_handler(WorldEvent::new(
+        self.add_event(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
             update_entities_status,
         ));
 
         // move the map Downward
-        self.add_event_handler(WorldEvent::new(
+        self.add_event(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            |world| world.map.update(&mut world.rng),
+            MapUpdater, // Exclusive type (implements EventHandler) to update map
         ));
 
-        self.add_event_handler(WorldEvent::new(
+        self.add_event(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
             create_random_entities,
         ));
 
         // Move elements along map movements
-        self.add_event_handler(WorldEvent::new(
+        self.add_event(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
             move_entities,
         ));
 
-        self.add_event_handler(WorldEvent::new(
+        self.add_event(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
             move_bullets,
         ));
 
-        self.add_event_handler(WorldEvent::new(
+        self.add_event(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            |world| {
+            EventHandler::new(|world| {
                 if world.player.fuel >= 1 {
                     world.player.fuel -= 1;
                 }
-            },
+            }),
         ));
 
-        self.add_event_handler(WorldEvent::new(
+        self.add_event(WorldEvent::new(
             WorldEventTrigger::Anything,
             true,
-            |world| {
+            // Instead of using EventHandler::new(...)
+            |world: &mut World| {
                 world.player.traveled += 1;
             },
         ));
@@ -190,7 +195,7 @@ impl<'g> Game<'g> {
         //      then go back to normal and increase enemies spawn chance.
         self.add_timer(
             WorldTimer::new(Duration::from_secs(60), true),
-            move |timer_key, world| {
+            TimerEventHandler::new(move |timer_key, world| {
                 world.map.change_river_mode(RiverMode::ConstWidthAndCenter {
                     width: world.max_c() / 3,
                     center_c: world.max_c() / 2,
@@ -199,13 +204,14 @@ impl<'g> Game<'g> {
                 world.temp_popup(
                     "More enemies ...",
                     Duration::from_secs(1),
-                    |_, _| {},
+                    LeaveAlone,
                     ContentStyle::new().black().on_yellow(),
                 );
 
                 world.add_timer(
                     WorldTimer::new(Duration::from_secs(10), false),
-                    move |_, world| {
+                    // Instead of using TimerEventHandler::new(...)
+                    move |world: &mut World| {
                         world.reset_timer(&timer_key);
                         if world.enemy_spawn_probability.value < 1.0 {
                             world.enemy_spawn_probability.value += 0.1;
@@ -213,7 +219,7 @@ impl<'g> Game<'g> {
                         world.map.restore_river_mode();
                     },
                 );
-            },
+            }),
         );
 
         // Improve enemies armor by 1 every 60 (so difficult)
@@ -232,18 +238,21 @@ impl<'g> Game<'g> {
         // );
 
         // Update elapsed time every 1 sec
-        self.add_timer(WorldTimer::new(Duration::from_secs(1), true), |_, world| {
-            world.elapsed_time += 1;
-        });
+        self.add_timer(
+            WorldTimer::new(Duration::from_secs(1), true),
+            |world: &mut World| {
+                world.elapsed_time += 1;
+            },
+        );
 
         // ---- Temporary events: Triggered on specified conditions (is_continues: false) ----
 
         // Opening events and popups
         let style = ContentStyle::new().green().on_magenta();
-        self.add_event_handler(WorldEvent::new(
+        self.add_event(WorldEvent::new(
             WorldEventTrigger::GameStarted,
             false,
-            move |world| {
+            move |world: &mut World| {
                 world.enemy_spawn_probability.value = 0.0;
                 world.fuel_spawn_probability.value = 0.0;
 
@@ -255,22 +264,22 @@ impl<'g> Game<'g> {
                 world.temp_popup(
                     "Warmup",
                     Duration::from_secs(5),
-                    move |_, world| {
+                    move |world: &mut World| {
                         world.temp_popup(
                             "Ready !!",
                             Duration::from_secs(2),
-                            move |_, world| {
+                            move |world: &mut World| {
                                 world.temp_popup(
                                     "!!! GO !!!",
                                     Duration::from_secs(1),
-                                    |_, world| {
+                                    |world: &mut World| {
                                         world.map.restore_river_mode();
                                         world.fuel_spawn_probability.restore();
                                         world.enemy_spawn_probability.restore();
 
                                         world.add_timer(
                                             WorldTimer::new(Duration::from_secs(10), true),
-                                            |_, world| {
+                                            |_, world: &mut World| {
                                                 world.player.score += 10;
                                             },
                                         );

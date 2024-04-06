@@ -2,7 +2,11 @@ use std::{cmp::Ordering, collections::VecDeque};
 
 use rand::{rngs::ThreadRng, Rng};
 
-use crate::utilities::{restorable::Restorable, stout_ext::AsLocationTuple};
+use crate::utilities::{
+    event_handler::{EventHandler, IntoEventHandler},
+    restorable::Restorable,
+    stout_ext::AsLocationTuple,
+};
 
 #[derive(Clone)]
 pub struct RiverPart {
@@ -69,6 +73,13 @@ impl RiverPart {
     }
 }
 
+/// The mode of the river.
+///
+/// This move internally controls two main values.
+/// - River center
+/// - River width
+///
+/// (At any part (line) of the river)
 #[derive(Clone)]
 #[allow(dead_code)]
 pub enum RiverMode {
@@ -92,6 +103,9 @@ pub enum RiverMode {
     },
 }
 
+/// The [`Map`].
+///
+/// The river is inside map and the map can control river's direction using [`RiverMode`].
 pub struct Map {
     pub max_c: u16,
     pub max_l: u16,
@@ -194,6 +208,14 @@ impl Map {
 
     pub fn river_parts(&self) -> &VecDeque<RiverPart> {
         &self.river_parts
+    }
+}
+
+pub struct MapUpdater;
+
+impl<'g> IntoEventHandler<'g> for MapUpdater {
+    fn into_event_handler(self) -> crate::utilities::event_handler::EventHandler<'g> {
+        EventHandler::new(|world| world.map.update(&mut world.rng))
     }
 }
 

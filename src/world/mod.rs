@@ -11,7 +11,12 @@ use uuid::Uuid;
 use crate::{
     canvas::Canvas,
     entities::{Entity, Player},
-    utilities::{container::Container, drawable::Drawable, restorable::Restorable},
+    utilities::{
+        container::Container,
+        drawable::Drawable,
+        event_handler::{EventHandler, IntoEventHandler, IntoTimerEventHandler, TimerKey},
+        restorable::Restorable,
+    },
 };
 
 use self::map::Map;
@@ -47,14 +52,14 @@ pub enum WorldEventTrigger<'g> {
     GameStarted,
     Anything,
     Traveled(u16),
-    TimerElapsed(String),
+    TimerElapsed(TimerKey),
     DrawingExists(String),
     Custom(Box<dyn Fn(&World) -> bool + 'g>),
 }
 
 impl<'g> WorldEventTrigger<'g> {
     #[allow(dead_code)]
-    pub fn timer_elapsed(timer_key: impl Into<String>) -> Self {
+    pub fn timer_elapsed(timer_key: impl Into<TimerKey>) -> Self {
         Self::TimerElapsed(timer_key.into())
     }
 
@@ -78,24 +83,24 @@ impl<'g> WorldEventTrigger<'g> {
 pub struct WorldEvent<'g> {
     pub trigger: WorldEventTrigger<'g>,
     pub is_continues: bool,
-    pub handler: Box<dyn Fn(&mut World) + 'g>,
+    pub handler: EventHandler<'g>,
 }
 
 impl<'g> WorldEvent<'g> {
-    /// Will create a continues event handler.
     pub fn new(
         trigger: WorldEventTrigger<'g>,
         is_continues: bool,
-        handler: impl Fn(&mut World) + 'g,
+        handler: impl IntoEventHandler<'g>,
     ) -> Self {
         Self {
             trigger,
-            handler: Box::new(handler),
+            handler: handler.into_event_handler(),
             is_continues,
         }
     }
 }
 
+/// The [`World`]! Contains everything except events.
 pub struct World<'g> {
     pub canvas: Canvas,
     pub status: WorldStatus,
@@ -152,7 +157,7 @@ impl<'g> World<'g> {
         self.entities.iter().filter(|e| e.entity_type.is_enemy())
     }
 
-    pub fn timer_elapsed(&self, key: &str) -> Option<bool> {
+    fn timer_elapsed(&self, key: &str) -> Option<bool> {
         let mut timers = self.timers.borrow_mut();
         let timer = timers.get_mut(key)?;
 
@@ -173,47 +178,91 @@ impl<'g> World<'g> {
         }
     }
 
-    pub fn add_timer(&mut self, timer: WorldTimer, on_elapsed: impl Fn(String, &mut World) + 'g) {
-        let is_repeat = timer.repeat;
+    /// Adds just a timer.
+    ///
+    /// You may want to use [`add_event`] to attach an event to the timer.
+    pub fn add_raw_timer(&mut self, timer: WorldTimer) -> TimerKey {
         let key: String = Uuid::new_v4().to_string();
         self.timers.get_mut().insert(key.clone(), timer);
-        self.add_event_handler(WorldEvent::new(
-            WorldEventTrigger::TimerElapsed(key.clone()),
+        TimerKey::new(key)
+    }
+
+    /// Adds a timer with a job for every ticks.
+    ///
+    /// The job is a [`TimerEventHandler`] which can accepts both
+    /// [`TimerKey`] and [`&mut World`] or just [`&mut World`] or anything that
+    /// implements [`IntoTimerEventHandler`].
+    ///
+    /// You can use [`add_raw_timer`] to add timer without any job on ticks but that
+    /// would be useless. You may want to use [`add_event`] to attach an event to the timer.
+    pub fn add_timer<Params>(
+        &mut self,
+        timer: WorldTimer,
+        on_elapsed: impl IntoTimerEventHandler<'g, Params>,
+    ) {
+        let is_repeat = timer.repeat;
+        let timer_key = self.add_raw_timer(timer);
+
+        self.add_event(WorldEvent::new(
+            WorldEventTrigger::TimerElapsed(timer_key.clone()),
             is_repeat,
-            move |world| on_elapsed(key.clone(), world),
+            on_elapsed.into_event_handler(timer_key),
         ));
     }
 
+    /// Manually reset a timer.
     pub fn reset_timer(&mut self, timer_key: &str) -> Option<bool> {
         let timer = self.timers.get_mut().get_mut(timer_key)?;
         timer.instant = Instant::now();
         Some(true)
     }
 
+    /// Adds a custom drawing to the screen.
+    ///
+    /// Drawing can then be cleared using guess what?
     pub fn add_drawing(&mut self, key: impl Into<String>, drawing: impl Drawable + 'static) {
         self.custom_drawings.insert(key.into(), Box::new(drawing));
     }
 
+    /// Clears a previously added drawing.
     pub fn clear_drawing(&mut self, key: &str) {
         self.custom_drawings.remove(key);
     }
 
-    pub fn add_event_handler(&mut self, event: WorldEvent<'g>) {
+    /// Adds an event handler to the [`Game`].
+    ///
+    /// The event is added to the game at the end of current loop and NOT instantly!
+    pub fn add_event(&mut self, event: WorldEvent<'g>) {
         self.new_events.push(event);
     }
 
-    pub fn temp_popup(
+    /// Shows a temporary popup with custom style and a job after its disposal.
+    ///
+    /// The job after popup is a [`TimerEventHandler`] which can accepts both
+    /// [`TimerKey`] and [`&mut World`] or just [`&mut World`] or anything that
+    /// implements [`IntoTimerEventHandler`].
+    ///
+    /// ## Example
+    /// ```rust
+    /// world.temp_popup("Hello World!", Duration::from_secs(5), LeaveAlone, None)
+    /// ```
+    /// [`LeaveAlone`] is an [`IntoTimerEventHandler`] which dose nothing.
+    pub fn temp_popup<Params>(
         &mut self,
         message: impl Into<String>,
         duration: Duration,
-        after: impl Fn(String, &mut World) + 'g,
+        after: impl IntoTimerEventHandler<'g, Params>,
         style: impl Into<Option<ContentStyle>>,
     ) {
         let key = Uuid::new_v4().to_string();
         self.add_drawing(&key, self.popup(message, style));
-        self.add_timer(WorldTimer::new(duration, false), move |timer_key, w| {
-            w.clear_drawing(&key);
-            after(timer_key, w);
-        });
+        let handler = after.into_timer_event_handler();
+        self.add_timer(
+            WorldTimer::new(duration, false),
+            move |timer_key, w: &mut World| {
+                w.clear_drawing(&key);
+                handler.handle(timer_key, w);
+            },
+        );
     }
 } // end of World implementation.

@@ -1,3 +1,4 @@
+/// A type that stores a default value and can be restored to  default at anytime.
 pub struct Restorable<T>
 where
     T: Clone,
