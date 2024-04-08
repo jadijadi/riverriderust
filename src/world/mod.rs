@@ -1,6 +1,7 @@
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet, VecDeque},
+    rc::Rc,
     time::{Duration, Instant},
 };
 
@@ -14,7 +15,7 @@ use crate::{
     utilities::{
         container::Container,
         drawable::Drawable,
-        event_handler::{EventHandler, IntoEventHandler, IntoTimerEventHandler, TimerKey},
+        event_handler::{EventHandler, IntoEventHandler, IntoTimerEventHandler, TimerEventHandler},
         restorable::Restorable,
     },
 };
@@ -25,19 +26,83 @@ mod drawings;
 pub mod events;
 pub mod map;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TimerKey(String);
+
+impl From<String> for TimerKey {
+    fn from(value: String) -> Self {
+        TimerKey(value)
+    }
+}
+
+impl std::ops::Deref for TimerKey {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WorldTimerData {
+    key: TimerKey,
+    duration: Duration,
+    repeat: bool,
+}
+
+impl WorldTimerData {
+    pub fn new(duration: Duration, repeat: bool) -> Self {
+        Self {
+            key: TimerKey(Uuid::new_v4().to_string()),
+            duration,
+            repeat,
+        }
+    }
+}
+
+impl WorldTimerData {
+    pub fn key(&self) -> &TimerKey {
+        &self.key
+    }
+
+    #[allow(dead_code)]
+    pub fn duration(&self) -> &Duration {
+        &self.duration
+    }
+
+    pub fn is_repeat(&self) -> bool {
+        self.repeat
+    }
+}
+
+#[derive(Debug)]
 pub struct WorldTimer {
-    pub duration: Duration,
-    pub repeat: bool,
-    pub instant: Instant,
+    pub data: WorldTimerData,
+    instant: Instant,
 }
 
 impl WorldTimer {
     pub fn new(duration: Duration, repeat: bool) -> Self {
         Self {
-            repeat,
-            duration,
+            data: WorldTimerData::new(duration, repeat),
             instant: Instant::now(),
         }
+    }
+
+    pub fn elapsed(&self) -> bool {
+        self.instant.elapsed() > self.data.duration
+    }
+
+    pub fn reset(&mut self) {
+        log::info!("Timer {:?} reset.", self.data.key);
+        self.instant = Instant::now();
+    }
+
+    fn on_elapsed_event<'g, Params>(
+        &self,
+        handler: impl IntoTimerEventHandler<'g, Params>,
+    ) -> TimerElapsedEvent<'g> {
+        TimerElapsedEvent::new(self.data.clone(), handler)
     }
 }
 
@@ -47,56 +112,164 @@ pub enum WorldStatus {
     Solid,
 }
 
+#[derive(Clone)]
+pub struct EventTrigger {
+    trigger: Rc<dyn Fn(&World) -> bool>,
+}
+
+impl EventTrigger {
+    pub fn new(trigger: impl Fn(&World) -> bool + 'static) -> Self {
+        Self {
+            trigger: Rc::new(trigger),
+        }
+    }
+
+    pub fn is_triggered(&self, world: &World) -> bool {
+        (self.trigger)(world)
+    }
+}
+
+pub trait IntoEventTrigger {
+    fn into_event_trigger(self) -> EventTrigger;
+}
+
+impl IntoEventTrigger for EventTrigger {
+    fn into_event_trigger(self) -> EventTrigger {
+        self
+    }
+}
+
+#[derive(Clone)]
 #[allow(dead_code)]
-pub enum WorldEventTrigger<'g> {
+pub enum WorldEventTrigger {
+    Always,
     GameStarted,
-    Anything,
     Traveled(u16),
     TimerElapsed(TimerKey),
     DrawingExists(String),
-    Custom(Box<dyn Fn(&World) -> bool + 'g>),
+    Signal(String),
 }
 
-impl<'g> WorldEventTrigger<'g> {
+impl WorldEventTrigger {
     #[allow(dead_code)]
     pub fn timer_elapsed(timer_key: impl Into<TimerKey>) -> Self {
         Self::TimerElapsed(timer_key.into())
     }
 
-    #[allow(dead_code)]
-    pub fn custom(trigger: impl Fn(&World) -> bool + 'g) -> Self {
-        Self::Custom(Box::new(trigger))
-    }
-
     pub fn is_triggered(&self, world: &World) -> bool {
         match self {
-            WorldEventTrigger::Anything => true,
+            WorldEventTrigger::Always => true,
             WorldEventTrigger::Traveled(distance) => &world.player.traveled >= distance,
             WorldEventTrigger::TimerElapsed(key) => world.timer_elapsed(key).unwrap_or(false),
             WorldEventTrigger::GameStarted => world.elapsed_loops <= 0,
-            WorldEventTrigger::Custom(trigger) => trigger(world),
             WorldEventTrigger::DrawingExists(key) => world.custom_drawings.contains_key(key),
+            WorldEventTrigger::Signal(signal_key) => world.signaled(signal_key),
         }
     }
 }
 
+impl IntoEventTrigger for WorldEventTrigger {
+    fn into_event_trigger(self) -> EventTrigger {
+        EventTrigger::new(move |world| self.is_triggered(world))
+    }
+}
+
 pub struct WorldEvent<'g> {
-    pub trigger: WorldEventTrigger<'g>,
+    pub trigger: EventTrigger,
     pub is_continues: bool,
     pub handler: EventHandler<'g>,
 }
 
 impl<'g> WorldEvent<'g> {
     pub fn new(
-        trigger: WorldEventTrigger<'g>,
+        trigger: impl IntoEventTrigger,
         is_continues: bool,
         handler: impl IntoEventHandler<'g>,
     ) -> Self {
         Self {
-            trigger,
+            trigger: trigger.into_event_trigger(),
             handler: handler.into_event_handler(),
             is_continues,
         }
+    }
+}
+
+pub trait Event<'g> {
+    fn is_continues(&self) -> bool;
+
+    fn trigger(&self) -> impl IntoEventTrigger;
+
+    fn handler(self) -> impl IntoEventHandler<'g>;
+
+    fn into_world_event(self) -> WorldEvent<'g>
+    where
+        Self: Sized + 'g,
+    {
+        let trigger = self.trigger().into_event_trigger();
+        let is_continues = self.is_continues();
+        let handler = self.handler().into_event_handler();
+        WorldEvent::new(trigger, is_continues, handler)
+    }
+}
+
+impl<'g> Event<'g> for WorldEvent<'g> {
+    fn trigger(&self) -> impl IntoEventTrigger {
+        self.trigger.to_owned()
+    }
+
+    fn handler(self) -> impl IntoEventHandler<'g> {
+        self.handler
+    }
+
+    fn is_continues(&self) -> bool {
+        self.is_continues
+    }
+}
+
+pub struct TimerElapsedEvent<'g> {
+    timer: WorldTimerData,
+    handler: TimerEventHandler<'g>,
+}
+
+impl<'g> TimerElapsedEvent<'g> {
+    pub fn new<Params>(
+        timer: WorldTimerData,
+        handler: impl IntoTimerEventHandler<'g, Params>,
+    ) -> Self {
+        Self {
+            timer,
+            handler: handler.into_timer_event_handler(),
+        }
+    }
+}
+
+impl<'g> Event<'g> for TimerElapsedEvent<'g> {
+    fn is_continues(&self) -> bool {
+        self.timer.is_repeat()
+    }
+
+    fn trigger(&self) -> impl IntoEventTrigger {
+        WorldEventTrigger::TimerElapsed(self.timer.key.clone())
+    }
+
+    fn handler(self) -> impl IntoEventHandler<'g> {
+        self.handler.into_event_handler(self.timer.key)
+    }
+}
+
+pub trait IntoEvent<'g> {
+    fn into_event(self, handler: impl IntoEventHandler<'g>) -> impl Event<'g>;
+}
+
+impl<'g, T: Event<'g> + 'g> IntoEvent<'g> for T {
+    fn into_event(self, _: impl IntoEventHandler<'g>) -> impl Event<'g> {
+        self.into_world_event()
+    }
+}
+
+impl<'g> IntoEvent<'g> for WorldTimer {
+    fn into_event(self, handler: impl IntoEventHandler<'g>) -> impl Event<'g> {
+        self.on_elapsed_event(handler.into_event_handler())
     }
 }
 
@@ -117,11 +290,12 @@ pub struct World<'g> {
 
     pub elapsed_time: usize,
     pub elapsed_loops: usize,
-    pub timers: RefCell<HashMap<String, WorldTimer>>, // RefCell for interior mutability
+    pub timers: RefCell<HashMap<TimerKey, WorldTimer>>, // RefCell for interior mutability
     pub custom_drawings: HashMap<String, Box<dyn Drawable>>,
 
     /// Events that may be added inside game loops
     pub new_events: Vec<WorldEvent<'g>>,
+    pub signals: RefCell<HashSet<String>>,
 }
 
 impl<'g> World<'g> {
@@ -137,6 +311,7 @@ impl<'g> World<'g> {
             entities: Vec::new(),
             rng: thread_rng(),
             timers: RefCell::new(HashMap::new()),
+            signals: RefCell::new(HashSet::new()),
             custom_drawings: HashMap::new(),
             enemies_armor: 1,
             enemy_spawn_probability: 0.1.into(),
@@ -157,18 +332,25 @@ impl<'g> World<'g> {
         self.entities.iter().filter(|e| e.entity_type.is_enemy())
     }
 
-    fn timer_elapsed(&self, key: &str) -> Option<bool> {
+    fn timer_elapsed(&self, key: &TimerKey) -> Option<bool> {
         let mut timers = self.timers.borrow_mut();
-        let timer = timers.get_mut(key)?;
+        let timer = match timers.get_mut(key) {
+            Some(timer) => timer,
+            None => {
+                log::warn!("Checking for non-existence timer {key:?}");
+                return None;
+            }
+        };
 
-        if timer.instant.elapsed() <= timer.duration {
+        if !timer.elapsed() {
             // Not expired -> keep
             Some(false)
         } else {
-            if timer.repeat {
+            log::info!("{key:?} elapsed.");
+            if timer.data.is_repeat() {
                 // Expired but repeat -> keep
                 // Reset instant
-                timer.instant = Instant::now();
+                timer.reset();
                 Some(true)
             } else {
                 // Expired and no repeat -> remove
@@ -178,13 +360,24 @@ impl<'g> World<'g> {
         }
     }
 
+    fn signaled(&self, signal_key: &str) -> bool {
+        self.signals.borrow_mut().remove(signal_key)
+    }
+
+    fn send_signal(&mut self, signal_key: impl Into<Option<String>>) -> String {
+        let signal_key =
+            Into::<Option<String>>::into(signal_key).unwrap_or(Uuid::new_v4().to_string());
+        self.signals.borrow_mut().insert(signal_key.clone());
+        signal_key
+    }
+
     /// Adds just a timer.
     ///
     /// You may want to use [`add_event`] to attach an event to the timer.
     pub fn add_raw_timer(&mut self, timer: WorldTimer) -> TimerKey {
-        let key: String = Uuid::new_v4().to_string();
+        let key = timer.data.key().clone();
         self.timers.get_mut().insert(key.clone(), timer);
-        TimerKey::new(key)
+        key
     }
 
     /// Adds a timer with a job for every ticks.
@@ -200,28 +393,32 @@ impl<'g> World<'g> {
         timer: WorldTimer,
         on_elapsed: impl IntoTimerEventHandler<'g, Params>,
     ) {
-        let is_repeat = timer.repeat;
-        let timer_key = self.add_raw_timer(timer);
-
-        self.add_event(WorldEvent::new(
-            WorldEventTrigger::TimerElapsed(timer_key.clone()),
-            is_repeat,
-            on_elapsed.into_event_handler(timer_key),
-        ));
+        self.add_event(timer.on_elapsed_event(on_elapsed));
+        self.add_raw_timer(timer);
     }
 
     /// Manually reset a timer.
-    pub fn reset_timer(&mut self, timer_key: &str) -> Option<bool> {
+    pub fn reset_timer(&mut self, timer_key: &TimerKey) -> Option<bool> {
         let timer = self.timers.get_mut().get_mut(timer_key)?;
-        timer.instant = Instant::now();
+        timer.reset();
         Some(true)
     }
 
-    /// Adds a custom drawing to the screen.
+    /// Adds a custom drawing to the screen. The `key` parameter is optional.
+    /// If you leave it as None, a random key is generated.
+    ///
+    /// Return value is the key (_either specified or generated_)
     ///
     /// Drawing can then be cleared using guess what?
-    pub fn add_drawing(&mut self, key: impl Into<String>, drawing: impl Drawable + 'static) {
-        self.custom_drawings.insert(key.into(), Box::new(drawing));
+    pub fn add_drawing(
+        &mut self,
+        drawing: impl Drawable + 'static,
+        key: impl Into<Option<String>>,
+    ) -> String {
+        let key: Option<String> = key.into();
+        let key = key.unwrap_or(Uuid::new_v4().to_string());
+        self.custom_drawings.insert(key.clone(), Box::new(drawing));
+        key
     }
 
     /// Clears a previously added drawing.
@@ -232,8 +429,8 @@ impl<'g> World<'g> {
     /// Adds an event handler to the [`Game`].
     ///
     /// The event is added to the game at the end of current loop and NOT instantly!
-    pub fn add_event(&mut self, event: WorldEvent<'g>) {
-        self.new_events.push(event);
+    pub fn add_event(&mut self, event: impl Event<'g> + 'g) {
+        self.new_events.push(event.into_world_event());
     }
 
     /// Shows a temporary popup with custom style and a job after its disposal.
@@ -254,15 +451,53 @@ impl<'g> World<'g> {
         after: impl IntoTimerEventHandler<'g, Params>,
         style: impl Into<Option<ContentStyle>>,
     ) {
-        let key = Uuid::new_v4().to_string();
-        self.add_drawing(&key, self.popup(message, style));
-        let handler = after.into_timer_event_handler();
+        let key = self.add_drawing(self.popup(message, style), None);
+        log::info!("Added drawing with key {key}");
+        let after = after.into_timer_event_handler();
         self.add_timer(
             WorldTimer::new(duration, false),
             move |timer_key, w: &mut World| {
+                log::info!(
+                    "Called popup timer elapsed with timer key {timer_key:?} for popup {key}."
+                );
                 w.clear_drawing(&key);
-                handler.handle(timer_key, w);
+                after.handle(timer_key, w);
             },
         );
+    }
+
+    /// Adds a series of popups that are shown one ofter the other.
+    /// And a job that is triggered when the series reaches its end and latest
+    /// popup gone off.
+    pub fn popup_series(
+        &mut self,
+        popups: impl IntoIterator<Item = (String, Duration, ContentStyle)>,
+        after: impl IntoEventHandler<'g>,
+    ) {
+        fn advance(
+            world: &mut World,
+            mut popups: VecDeque<(String, Duration, ContentStyle)>,
+            signal_key: Uuid,
+        ) {
+            if let Some((message, duration, style)) = popups.pop_front() {
+                let handler = if popups.is_empty() {
+                    EventHandler::new(move |world| {
+                        world.send_signal(signal_key.to_string());
+                    })
+                } else {
+                    EventHandler::new(move |world| advance(world, popups.clone(), signal_key))
+                };
+                world.temp_popup(message, duration, handler, style)
+            }
+        }
+
+        let signal_key = Uuid::new_v4();
+        // Waiting for a signal that is triggered when latest popup goes off.
+        self.add_event(WorldEvent::new(
+            WorldEventTrigger::Signal(signal_key.to_string()),
+            false,
+            after,
+        ));
+        advance(self, popups.into_iter().collect(), signal_key)
     }
 } // end of World implementation.

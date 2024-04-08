@@ -6,12 +6,12 @@ use rand::Rng;
 use crate::{
     entities::{DeathCause, Enemy, Entity, EntityStatus, EntityType, Fuel, PlayerStatus},
     game::Game,
-    utilities::event_handler::{EventHandler, LeaveAlone, TimerEventHandler},
+    utilities::event_handler::{EventHandler, IntoEventHandler, LeaveAlone, TimerEventHandler},
 };
 
 use super::{
     map::{MapUpdater, RiverMode},
-    World, WorldEvent, WorldEventTrigger, WorldTimer,
+    Event, IntoEventTrigger, World, WorldEvent, WorldEventTrigger, WorldTimer,
 };
 
 fn is_the_chance(probability: f32) -> bool {
@@ -19,15 +19,31 @@ fn is_the_chance(probability: f32) -> bool {
     rng.gen::<f32>() < probability
 }
 
-/// check if player hit the ground
-fn update_player_status(world: &mut World) {
-    if !world.map.is_in_river(&world.player) {
-        world.player.status = PlayerStatus::Dead(DeathCause::Ground);
-        return;
+pub struct PlayerStatusUpdater;
+
+// Using this trait we can define everything about our event in one place.
+// And the type which this trait is implemented for, can be directly used in add_event(...) method.
+// Eg: game.add_event(PlayerStatusUpdater)
+impl<'g> Event<'g> for PlayerStatusUpdater {
+    fn is_continues(&self) -> bool {
+        true
     }
 
-    if world.player.fuel == 0 {
-        world.player.status = PlayerStatus::Dead(DeathCause::Fuel);
+    fn trigger(&self) -> impl IntoEventTrigger {
+        WorldEventTrigger::Always
+    }
+
+    fn handler(self) -> impl IntoEventHandler<'g> {
+        |world: &mut World| {
+            if !world.map.is_in_river(&world.player) {
+                world.player.status = PlayerStatus::Dead(DeathCause::Ground);
+                return;
+            }
+
+            if world.player.fuel == 0 {
+                world.player.status = PlayerStatus::Dead(DeathCause::Fuel);
+            }
+        }
     }
 }
 
@@ -132,47 +148,41 @@ impl<'g> Game<'g> {
     pub fn setup_event_handlers(&mut self) {
         // ---- Permanent event, running on every loop (is_continues: true) ----
         // check if player hit the ground
-        self.add_event(WorldEvent::new(
-            WorldEventTrigger::Anything,
-            true,
-            update_player_status,
-        ));
+        self.add_event(PlayerStatusUpdater);
 
         // check enemy hit something
         self.add_event(WorldEvent::new(
-            WorldEventTrigger::Anything,
+            WorldEventTrigger::Always,
             true,
             update_entities_status,
         ));
 
         // move the map Downward
-        self.add_event(WorldEvent::new(
-            WorldEventTrigger::Anything,
-            true,
-            MapUpdater, // Exclusive type (implements EventHandler) to update map
-        ));
+        self.add_event(
+            MapUpdater, // Exclusive type (implements IntoWorldEvent) to update map
+        );
 
         self.add_event(WorldEvent::new(
-            WorldEventTrigger::Anything,
+            WorldEventTrigger::Always,
             true,
             create_random_entities,
         ));
 
         // Move elements along map movements
         self.add_event(WorldEvent::new(
-            WorldEventTrigger::Anything,
+            WorldEventTrigger::Always,
             true,
             move_entities,
         ));
 
         self.add_event(WorldEvent::new(
-            WorldEventTrigger::Anything,
+            WorldEventTrigger::Always,
             true,
             move_bullets,
         ));
 
         self.add_event(WorldEvent::new(
-            WorldEventTrigger::Anything,
+            WorldEventTrigger::Always,
             true,
             EventHandler::new(|world| {
                 if world.player.fuel >= 1 {
@@ -182,7 +192,7 @@ impl<'g> Game<'g> {
         ));
 
         self.add_event(WorldEvent::new(
-            WorldEventTrigger::Anything,
+            WorldEventTrigger::Always,
             true,
             // Instead of using EventHandler::new(...)
             |world: &mut World| {
@@ -261,57 +271,24 @@ impl<'g> Game<'g> {
                     center_c: world.max_c() / 2,
                 });
 
-                // TODO: Something like (v) this is better
-                // world.popup_series(
-                //     [
-                //         ("Warmup".to_string(), Duration::from_secs(5), style),
-                //         ("Ready !!".to_string(), Duration::from_secs(2), style),
-                //         ("!!! GO !!!".to_string(), Duration::from_secs(1), style),
-                //     ],
-                //     |world: &mut World| {
-                //         world.map.restore_river_mode();
-                //         world.fuel_spawn_probability.restore();
-                //         world.enemy_spawn_probability.restore();
+                world.popup_series(
+                    [
+                        ("Warmup".to_string(), Duration::from_secs(5), style),
+                        ("Ready !!".to_string(), Duration::from_secs(2), style),
+                        ("!!! GO !!!".to_string(), Duration::from_secs(1), style),
+                    ],
+                    |world: &mut World| {
+                        world.map.restore_river_mode();
+                        world.fuel_spawn_probability.restore();
+                        world.enemy_spawn_probability.restore();
 
-                //         world.add_timer(
-                //             WorldTimer::new(Duration::from_secs(10), true),
-                //             |_, world: &mut World| {
-                //                 world.player.score += 10;
-                //             },
-                //         );
-                //     },
-                // );
-
-                world.temp_popup(
-                    "Warmup",
-                    Duration::from_secs(5),
-                    move |world: &mut World| {
-                        world.temp_popup(
-                            "Ready !!",
-                            Duration::from_secs(2),
-                            move |world: &mut World| {
-                                world.temp_popup(
-                                    "!!! GO !!!",
-                                    Duration::from_secs(1),
-                                    |world: &mut World| {
-                                        world.map.restore_river_mode();
-                                        world.fuel_spawn_probability.restore();
-                                        world.enemy_spawn_probability.restore();
-
-                                        world.add_timer(
-                                            WorldTimer::new(Duration::from_secs(10), true),
-                                            |_, world: &mut World| {
-                                                world.player.score += 10;
-                                            },
-                                        );
-                                    },
-                                    style,
-                                )
+                        world.add_timer(
+                            WorldTimer::new(Duration::from_secs(10), true),
+                            |_, world: &mut World| {
+                                world.player.score += 10;
                             },
-                            style,
                         );
                     },
-                    style,
                 );
             },
         ));

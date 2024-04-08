@@ -1,4 +1,6 @@
-use crate::world::World;
+use std::rc::Rc;
+
+use crate::world::{TimerKey, World};
 
 pub struct EventHandler<'g> {
     handler: Box<dyn Fn(&mut World) + 'g>,
@@ -24,9 +26,7 @@ pub trait IntoEventHandler<'g> {
         Self: Sized,
     {
         let handler = self.into_event_handler();
-        TimerEventHandler {
-            handler: Box::new(move |_, world: &mut World| handler.handle(world)),
-        }
+        TimerEventHandler::new(move |_, world| handler.handle(world))
     }
 }
 
@@ -38,9 +38,7 @@ impl<'g> IntoEventHandler<'g> for EventHandler<'g> {
 
 impl<'g, T: Fn(&mut World) + 'g> IntoEventHandler<'g> for T {
     fn into_event_handler(self) -> EventHandler<'g> {
-        EventHandler {
-            handler: Box::new(self),
-        }
+        EventHandler::new(self)
     }
 }
 
@@ -48,51 +46,25 @@ pub struct LeaveAlone;
 
 impl<'g> IntoEventHandler<'g> for LeaveAlone {
     fn into_event_handler(self) -> EventHandler<'g> {
-        EventHandler {
-            handler: Box::new(|_| {}),
-        }
+        EventHandler::new(|_| {})
     }
 }
 
 #[derive(Clone)]
-pub struct TimerKey(String);
-
-impl From<String> for TimerKey {
-    fn from(value: String) -> Self {
-        TimerKey(value)
-    }
-}
-
-impl TimerKey {
-    pub fn new(key: String) -> Self {
-        TimerKey(key)
-    }
-}
-
-impl std::ops::Deref for TimerKey {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 pub struct TimerEventHandler<'g> {
-    handler: Box<dyn Fn(TimerKey, &mut World) + 'g>,
+    handler: Rc<dyn Fn(TimerKey, &mut World) + 'g>,
 }
 
 impl<'g> TimerEventHandler<'g> {
     pub fn into_event_handler(self, timer_key: TimerKey) -> EventHandler<'g> {
-        EventHandler {
-            handler: Box::new(move |world: &mut World| self.handle(timer_key.clone(), world)),
-        }
+        EventHandler::new(move |world| self.handle(timer_key.clone(), world))
     }
 }
 
 impl<'g> TimerEventHandler<'g> {
     pub fn new(handler: impl Fn(TimerKey, &mut World) + 'g) -> Self {
         Self {
-            handler: Box::new(handler),
+            handler: Rc::new(handler),
         }
     }
 
@@ -115,9 +87,7 @@ pub trait IntoTimerEventHandler<'g, Params> {
 
 impl<'g> IntoTimerEventHandler<'g, ()> for EventHandler<'g> {
     fn into_timer_event_handler(self) -> TimerEventHandler<'g> {
-        TimerEventHandler {
-            handler: Box::new(move |_, world: &mut World| self.handle(world)),
-        }
+        TimerEventHandler::new(move |_, world| self.handle(world))
     }
 }
 
@@ -131,24 +101,18 @@ impl<'g, T: Fn(TimerKey, &mut World) + 'g> IntoTimerEventHandler<'g, (TimerKey, 
     for T
 {
     fn into_timer_event_handler(self) -> TimerEventHandler<'g> {
-        TimerEventHandler {
-            handler: Box::new(self),
-        }
+        TimerEventHandler::new(self)
     }
 }
 
 impl<'g, T: Fn(&mut World) + 'g> IntoTimerEventHandler<'g, (&mut World<'g>,)> for T {
     fn into_timer_event_handler(self) -> TimerEventHandler<'g> {
-        TimerEventHandler {
-            handler: Box::new(move |_: TimerKey, world: &mut World| self(world)),
-        }
+        TimerEventHandler::new(move |_, world| self(world))
     }
 }
 
 impl<'g> IntoTimerEventHandler<'g, ()> for LeaveAlone {
     fn into_timer_event_handler(self) -> TimerEventHandler<'g> {
-        TimerEventHandler {
-            handler: Box::new(|_, _| {}),
-        }
+        TimerEventHandler::new(|_, _| {})
     }
 }

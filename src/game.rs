@@ -4,7 +4,7 @@ use crate::{
     entities::PlayerStatus,
     events::handle_pressed_keys,
     utilities::event_handler::IntoTimerEventHandler,
-    world::{World, WorldEvent, WorldEventTrigger, WorldStatus, WorldTimer},
+    world::{Event, World, WorldEvent, WorldEventTrigger, WorldStatus, WorldTimer},
 };
 
 /// The [`Game`].
@@ -24,8 +24,8 @@ impl<'g> Game<'g> {
     }
 
     /// Adds an event to the game.
-    pub fn add_event(&mut self, event: WorldEvent<'g>) {
-        self.events.push(event);
+    pub fn add_event(&mut self, event: impl Event<'g> + 'g) {
+        self.events.push(event.into_world_event());
     }
 
     /// Adds a timer with a job for every ticks.
@@ -41,13 +41,13 @@ impl<'g> Game<'g> {
         timer: WorldTimer,
         on_elapsed: impl IntoTimerEventHandler<'g, Params>,
     ) {
-        let is_repeat = timer.repeat;
+        let is_repeat = timer.data.is_repeat();
         let timer_key = self.world.borrow_mut().add_raw_timer(timer);
 
         self.add_event(WorldEvent::new(
             WorldEventTrigger::TimerElapsed(timer_key.clone()),
             is_repeat,
-            on_elapsed.into_event_handler(timer_key),
+            on_elapsed.into_event_handler(timer_key.clone()),
         ));
     }
 

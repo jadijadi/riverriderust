@@ -1,4 +1,5 @@
 use game::Game;
+use log::LevelFilter;
 use std::io::stdout;
 use utilities::stout_ext::StdoutExt;
 
@@ -17,6 +18,9 @@ mod utilities;
 mod world;
 
 fn main() -> std::io::Result<()> {
+    // Setup logger
+    simple_logging::log_to_file("riverraid.log", LevelFilter::Info)?;
+
     // init the screen
     let mut sc = stdout();
     let (maxc, maxl) = size().unwrap();

@@ -8,6 +8,8 @@ use crate::utilities::{
     stout_ext::AsLocationTuple,
 };
 
+use super::{Event, WorldEventTrigger};
+
 #[derive(Clone)]
 pub struct RiverPart {
     width: u16,
@@ -213,8 +215,16 @@ impl Map {
 
 pub struct MapUpdater;
 
-impl<'g> IntoEventHandler<'g> for MapUpdater {
-    fn into_event_handler(self) -> crate::utilities::event_handler::EventHandler<'g> {
+impl<'g> Event<'g> for MapUpdater {
+    fn is_continues(&self) -> bool {
+        true
+    }
+
+    fn trigger(&self) -> impl super::IntoEventTrigger {
+        WorldEventTrigger::Always
+    }
+
+    fn handler(self) -> impl IntoEventHandler<'g> {
         EventHandler::new(|world| world.map.update(&mut world.rng))
     }
 }
