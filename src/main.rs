@@ -1,21 +1,10 @@
-use game::Game;
+use events::setup_event_handlers;
 use log::LevelFilter;
 use std::io::stdout;
-use utilities::stout_ext::StdoutExt;
 
-use crossterm::{
-    cursor::{Hide, Show},
-    terminal::{disable_raw_mode, enable_raw_mode, size},
-    ExecutableCommand,
-};
-use world::World;
+use riverraid::Game;
 
-mod canvas;
-mod entities;
 mod events;
-mod game;
-mod utilities;
-mod world;
 
 fn main() -> std::io::Result<()> {
     // Setup logger
@@ -23,17 +12,15 @@ fn main() -> std::io::Result<()> {
 
     // init the screen
     let mut sc = stdout();
-    let (maxc, maxl) = size().unwrap();
-    sc.execute(Hide)?;
-    enable_raw_mode()?;
+
+    Game::prepare_terminal(&mut sc)?;
 
     // init the world
     let slowness = 80;
-
-    let mut game = Game::new(maxc, maxl);
+    let mut game = Game::new();
 
     // Events that are running forever once in each loop
-    game.setup_event_handlers();
+    setup_event_handlers(&mut game);
 
     // show welcoming banner
     game.welcome_screen(&mut sc)?;
@@ -49,7 +36,6 @@ fn main() -> std::io::Result<()> {
     game.clear_screen(&mut sc)?;
     game.goodbye_screen(&mut sc)?;
 
-    sc.clear_all()?.execute(Show)?;
-    disable_raw_mode()?;
+    Game::release_terminal(&mut sc)?;
     Ok(())
 }

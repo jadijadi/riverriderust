@@ -15,8 +15,9 @@ use crate::{
     game::Game,
     utilities::drawable::Drawable,
     utilities::stout_ext::StdoutExt,
-    World,
 };
+
+use super::World;
 
 pub struct PopupDrawing {
     max_c: u16,

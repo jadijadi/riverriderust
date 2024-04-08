@@ -1,9 +1,20 @@
-use std::{cell::RefCell, io::Stdout, thread, time::Duration};
+use std::{
+    cell::RefCell,
+    io::{self, Stdout},
+    thread,
+    time::Duration,
+};
+
+use crossterm::{
+    cursor::{Hide, Show},
+    terminal::{disable_raw_mode, enable_raw_mode, size},
+    ExecutableCommand,
+};
 
 use crate::{
     entities::PlayerStatus,
     events::handle_pressed_keys,
-    utilities::event_handler::IntoTimerEventHandler,
+    utilities::{event_handler::IntoTimerEventHandler, stout_ext::StdoutExt},
     world::{Event, World, WorldEvent, WorldEventTrigger, WorldStatus, WorldTimer},
 };
 
@@ -11,16 +22,31 @@ use crate::{
 ///
 /// Contains [`World`] and a list of events that act on world.
 pub struct Game<'g> {
-    pub world: RefCell<World<'g>>,
+    pub(crate) world: RefCell<World<'g>>,
     events: Vec<WorldEvent<'g>>,
 }
 
 impl<'g> Game<'g> {
-    pub fn new(max_c: u16, max_l: u16) -> Self {
-        Self {
+    fn run_events(&mut self) {
+        self.events.retain(|event| {
+            if event.trigger.is_triggered(&self.world.borrow()) {
+                event.handler.handle(&mut self.world.borrow_mut());
+                event.is_continues
+            } else {
+                true
+            }
+        });
+    }
+
+    pub fn new() -> Self {
+        let (max_c, max_l) = size().unwrap();
+        let mut game = Self {
             world: RefCell::new(World::new(max_c, max_l)),
             events: Vec::new(),
-        }
+        };
+
+        game.setup_basic_events();
+        game
     }
 
     /// Adds an event to the game.
@@ -49,17 +75,6 @@ impl<'g> Game<'g> {
             is_repeat,
             on_elapsed.into_event_handler(timer_key.clone()),
         ));
-    }
-
-    fn run_events(&mut self) {
-        self.events.retain(|event| {
-            if event.trigger.is_triggered(&self.world.borrow()) {
-                event.handler.handle(&mut self.world.borrow_mut());
-                event.is_continues
-            } else {
-                true
-            }
-        });
     }
 
     /// Runs main game loop.
@@ -96,5 +111,15 @@ impl<'g> Game<'g> {
 
     pub fn events_len(&self) -> usize {
         self.events.len()
+    }
+
+    pub fn prepare_terminal(sc: &mut Stdout) -> io::Result<()> {
+        sc.execute(Hide)?;
+        enable_raw_mode()
+    }
+
+    pub fn release_terminal(sc: &mut Stdout) -> io::Result<()> {
+        sc.clear_all()?.execute(Show)?;
+        disable_raw_mode()
     }
 }

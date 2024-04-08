@@ -1,3 +1,5 @@
+workspace = { members = [".", "riverraid"] }
+
 [package]
 name = "riverriderust"
 version = "0.1.0"
@@ -7,13 +9,7 @@ edition = "2021"
 
 [dependencies]
 log = "0.4.21"
-simple-logging = "2.0.2"
-crossterm = "0.27.0"
 rand = "0.8.5"
-
-[dependencies.uuid]
-version = "1.8.0"
-features = [
-    "v4",       # Lets you generate random UUIDs
-    "fast-rng", # Use a faster (but still sufficiently random) RNG
-]
+crossterm = "0.27.0"
+simple-logging = "2.0.2"
+riverraid = { version = "0.1.0", path = "riverraid" }
