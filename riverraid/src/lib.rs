@@ -1,7 +1,7 @@
 mod canvas;
 mod entities;
-mod events;
 mod game;
+mod keyboard_events;
 mod utilities;
 mod world;
 

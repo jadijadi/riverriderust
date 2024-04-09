@@ -13,7 +13,7 @@ use crossterm::{
 
 use crate::{
     entities::PlayerStatus,
-    events::handle_pressed_keys,
+    keyboard_events::handle_pressed_keys,
     utilities::{event_handler::IntoTimerEventHandler, stout_ext::StdoutExt},
     world::{Event, World, WorldEvent, WorldEventTrigger, WorldStatus, WorldTimer},
 };
