@@ -2,14 +2,23 @@ use std::rc::Rc;
 
 use crate::{timer::TimerKey, world::World};
 
+use super::LeaveAlone;
+
+#[derive(Clone)]
 pub struct EventHandler<'g> {
-    handler: Box<dyn Fn(&mut World) + 'g>,
+    handler: Rc<dyn Fn(&mut World) + 'g>,
+}
+
+impl<'g> Default for EventHandler<'g> {
+    fn default() -> Self {
+        IntoEventHandler::into_event_handler(LeaveAlone)
+    }
 }
 
 impl<'g> EventHandler<'g> {
     pub fn new(handler: impl Fn(&mut World) + 'g) -> Self {
         Self {
-            handler: Box::new(handler),
+            handler: Rc::new(handler),
         }
     }
 
@@ -42,8 +51,6 @@ impl<'g, T: Fn(&mut World) + 'g> IntoEventHandler<'g> for T {
     }
 }
 
-pub struct LeaveAlone;
-
 impl<'g> IntoEventHandler<'g> for LeaveAlone {
     fn into_event_handler(self) -> EventHandler<'g> {
         EventHandler::new(|_| {})
@@ -53,6 +60,12 @@ impl<'g> IntoEventHandler<'g> for LeaveAlone {
 #[derive(Clone)]
 pub struct TimerEventHandler<'g> {
     handler: Rc<dyn Fn(TimerKey, &mut World) + 'g>,
+}
+
+impl<'g> Default for TimerEventHandler<'g> {
+    fn default() -> Self {
+        IntoTimerEventHandler::into_timer_event_handler(LeaveAlone)
+    }
 }
 
 impl<'g> TimerEventHandler<'g> {

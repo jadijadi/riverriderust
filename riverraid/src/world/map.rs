@@ -217,7 +217,7 @@ impl Map {
 pub struct MapUpdater;
 
 impl<'g> Event<'g> for MapUpdater {
-    fn is_continues(&self) -> bool {
+    fn continues(&self) -> bool {
         true
     }
 

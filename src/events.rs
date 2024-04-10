@@ -9,10 +9,10 @@ use rand::Rng;
 use riverraid::{
     entities::{Bullet, DeathCause, Enemy, Entity, EntityStatus, EntityType, Fuel, PlayerStatus},
     events::{
-        handlers::{EventHandler, IntoEventHandler, LeaveAlone, TimerEventHandler},
+        handlers::{EventHandler, IntoEventHandler, TimerEventHandler},
         setup::IntoEventSetup,
         triggers::{IntoEventTrigger, WorldEventTrigger},
-        Event, WorldBuilder,
+        Event, LeaveAlone, WorldBuilder,
     },
     game::Game,
     timer::Timer,
@@ -103,7 +103,7 @@ pub struct PlayerStatusUpdater;
 // And the type which this trait is implemented for, can be directly used in add_event(...) method.
 // Eg: game.add_event(PlayerStatusUpdater)
 impl<'g> Event<'g> for PlayerStatusUpdater {
-    fn is_continues(&self) -> bool {
+    fn continues(&self) -> bool {
         true
     }
 
@@ -226,62 +226,61 @@ pub fn setup_event_handlers(game: &mut Game) {
     // ---- Permanent event, running on every loop (is_continues: true) ----
 
     // Handle keyboard events.
-    game.setup_event(WorldBuilder::new(
-        WorldEventTrigger::Always,
-        true,
-        EventHandler::new(|world| {
-            // Ignore errors.
-            let _ = keyboard_events(world);
-        }),
-    ));
+    game.setup_event(
+        WorldBuilder::new(WorldEventTrigger::Always)
+            .is_continues()
+            .with_handler(EventHandler::new(|world| {
+                // Ignore errors.
+                let _ = keyboard_events(world);
+            })),
+    );
 
     // check if player hit the ground
     game.setup_event(PlayerStatusUpdater);
 
     // check enemy hit something
-    game.setup_event(WorldBuilder::new(
-        WorldEventTrigger::Always,
-        true,
-        update_entities_status,
-    ));
+    game.setup_event(
+        WorldBuilder::new(WorldEventTrigger::Always)
+            .is_continues()
+            .with_handler(update_entities_status),
+    );
 
-    game.setup_event(WorldBuilder::new(
-        WorldEventTrigger::Always,
-        true,
-        create_random_entities,
-    ));
+    game.setup_event(
+        WorldBuilder::new(WorldEventTrigger::Always)
+            .is_continues()
+            .with_handler(create_random_entities),
+    );
 
     // Move elements along map movements
-    game.setup_event(WorldBuilder::new(
-        WorldEventTrigger::Always,
-        true,
-        move_entities,
-    ));
+    game.setup_event(
+        WorldBuilder::new(WorldEventTrigger::Always)
+            .is_continues()
+            .with_handler(move_entities),
+    );
 
-    game.setup_event(WorldBuilder::new(
-        WorldEventTrigger::Always,
-        true,
-        move_bullets,
-    ));
+    game.setup_event(
+        WorldBuilder::new(WorldEventTrigger::Always)
+            .is_continues()
+            .with_handler(move_bullets),
+    );
 
-    game.setup_event(WorldBuilder::new(
-        WorldEventTrigger::Always,
-        true,
-        EventHandler::new(|world| {
-            if world.player.fuel >= 1 {
-                world.player.fuel -= 1;
-            }
-        }),
-    ));
+    game.setup_event(
+        WorldBuilder::new(WorldEventTrigger::Always)
+            .is_continues()
+            .with_handler(EventHandler::new(|world| {
+                if world.player.fuel >= 1 {
+                    world.player.fuel -= 1;
+                }
+            })),
+    );
 
-    game.setup_event(WorldBuilder::new(
-        WorldEventTrigger::Always,
-        true,
-        // Instead of using EventHandler::new(...)
-        |world: &mut World| {
-            world.player.traveled += 1;
-        },
-    ));
+    game.setup_event(
+        WorldBuilder::new(WorldEventTrigger::Always)
+            .is_continues()
+            .with_handler(|world: &mut World| {
+                world.player.traveled += 1;
+            }),
+    );
 
     // At this point it's very simple to add stages to the game, using events.
     // - This's an example: Every 60 sec move river to center
@@ -341,10 +340,8 @@ pub fn setup_event_handlers(game: &mut Game) {
 
     // Opening events and popups
     let style = ContentStyle::new().green().on_magenta();
-    game.setup_event(WorldBuilder::new(
-        WorldEventTrigger::GameStarted,
-        false,
-        move |world: &mut World| {
+    game.setup_event(
+        WorldBuilder::new(WorldEventTrigger::GameStarted).with_handler(move |world: &mut World| {
             world.enemy_spawn_probability.value = 0.0;
             world.fuel_spawn_probability.value = 0.0;
 
@@ -372,6 +369,6 @@ pub fn setup_event_handlers(game: &mut Game) {
                     );
                 },
             );
-        },
-    ));
+        }),
+    );
 }

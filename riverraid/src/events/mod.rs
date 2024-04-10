@@ -1,5 +1,3 @@
-use typed_builder::TypedBuilder;
-
 use self::{
     handlers::{EventHandler, IntoEventHandler},
     triggers::{EventTrigger, IntoEventTrigger},
@@ -9,30 +7,35 @@ pub mod handlers;
 pub mod setup;
 pub mod triggers;
 
-#[derive(TypedBuilder)]
+#[derive(Clone, Default)]
 pub struct WorldBuilder<'g> {
     pub trigger: EventTrigger,
-    #[builder(default)]
-    pub is_continues: bool,
+    pub continues: bool,
     pub handler: EventHandler<'g>,
 }
 
 impl<'g> WorldBuilder<'g> {
-    pub fn new(
-        trigger: impl IntoEventTrigger,
-        is_continues: bool,
-        handler: impl IntoEventHandler<'g>,
-    ) -> Self {
+    pub fn new(trigger: impl IntoEventTrigger) -> Self {
         Self {
             trigger: trigger.into_event_trigger(),
-            handler: handler.into_event_handler(),
-            is_continues,
+            handler: Default::default(),
+            continues: Default::default(),
         }
+    }
+
+    pub fn is_continues(mut self) -> Self {
+        self.continues = true;
+        self
+    }
+
+    pub fn with_handler(mut self, handler: impl IntoEventHandler<'g>) -> Self {
+        self.handler = handler.into_event_handler();
+        self
     }
 }
 
 pub trait Event<'g> {
-    fn is_continues(&self) -> bool;
+    fn continues(&self) -> bool;
 
     fn trigger(&self) -> impl IntoEventTrigger;
 
@@ -43,9 +46,13 @@ pub trait Event<'g> {
         Self: Sized + 'g,
     {
         let trigger = self.trigger().into_event_trigger();
-        let is_continues = self.is_continues();
+        let continues = self.continues();
         let handler = self.handler().into_event_handler();
-        WorldBuilder::new(trigger, is_continues, handler)
+        WorldBuilder {
+            trigger,
+            continues,
+            handler,
+        }
     }
 }
 
@@ -58,7 +65,13 @@ impl<'g> Event<'g> for WorldBuilder<'g> {
         self.handler
     }
 
-    fn is_continues(&self) -> bool {
-        self.is_continues
+    fn continues(&self) -> bool {
+        self.continues
     }
 }
+
+/// Default value for callback options.
+///
+/// - Dose nothing if it's an event handler
+/// - Always true if it's a filter callback
+pub struct LeaveAlone;

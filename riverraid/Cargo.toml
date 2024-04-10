@@ -9,7 +9,6 @@ edition = "2021"
 log = "0.4.21"
 crossterm = "0.27.0"
 rand = "0.8.5"
-typed-builder = "0.18.1"
 
 [dependencies.uuid]
 version = "1.8.0"

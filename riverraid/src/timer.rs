@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::events::{
     handlers::{IntoEventHandler, IntoTimerEventHandler, TimerEventHandler},
     setup::{EventContainer, EventSetup, IntoEventSetup, TimerContainer},
-    triggers::WorldEventTrigger,
+    triggers::{IntoEventTrigger, WorldEventTrigger},
     WorldBuilder,
 };
 
@@ -98,11 +98,11 @@ impl<'g> TimerEventSetup<'g> {
     fn setup<C: EventContainer<'g> + TimerContainer<'g>>(self, container: &mut C) {
         let TimerEventSetup { timer, handler } = self;
 
-        container.add_event(WorldBuilder::new(
-            WorldEventTrigger::TimerElapsed(timer.data.key.clone()),
-            timer.data.repeat,
-            handler.into_event_handler(timer.data.key.clone()),
-        ));
+        container.add_event(WorldBuilder {
+            trigger: WorldEventTrigger::TimerElapsed(timer.data.key.clone()).into_event_trigger(),
+            continues: timer.data.repeat,
+            handler: handler.into_event_handler(timer.data.key.clone()),
+        });
         container.add_raw_timer(timer);
     }
 }

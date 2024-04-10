@@ -16,7 +16,7 @@ use crate::{
     events::{
         handlers::IntoTimerEventHandler,
         setup::{EventContainer, EventSetup, TimerContainer},
-        triggers::WorldEventTrigger,
+        triggers::{IntoEventTrigger, WorldEventTrigger},
         Event, WorldBuilder,
     },
     timer::Timer,
@@ -37,7 +37,7 @@ impl<'g> Game<'g> {
         self.events.retain(|event| {
             if event.trigger.is_triggered(&self.world.borrow()) {
                 event.handler.handle(&mut self.world.borrow_mut());
-                event.is_continues
+                event.continues
             } else {
                 true
             }
@@ -82,11 +82,11 @@ impl<'g> Game<'g> {
         let is_repeat = timer.data.is_repeat();
         let timer_key = self.add_raw_timer(timer);
 
-        self.add_event(WorldBuilder::new(
-            WorldEventTrigger::TimerElapsed(timer_key.clone()),
-            is_repeat,
-            on_elapsed.into_event_handler(timer_key.clone()),
-        ));
+        self.add_event(WorldBuilder {
+            trigger: WorldEventTrigger::TimerElapsed(timer_key.clone()).into_event_trigger(),
+            continues: is_repeat,
+            handler: on_elapsed.into_event_handler(timer_key.clone()),
+        });
     }
 
     /// Runs main game loop.

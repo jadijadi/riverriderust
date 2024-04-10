@@ -2,9 +2,17 @@ use std::rc::Rc;
 
 use crate::{timer::TimerKey, world::World};
 
+use super::LeaveAlone;
+
 #[derive(Clone)]
 pub struct EventTrigger {
     trigger: Rc<dyn Fn(&World) -> bool>,
+}
+
+impl Default for EventTrigger {
+    fn default() -> Self {
+        LeaveAlone.into_event_trigger()
+    }
 }
 
 impl EventTrigger {
@@ -26,6 +34,12 @@ pub trait IntoEventTrigger {
 impl IntoEventTrigger for EventTrigger {
     fn into_event_trigger(self) -> EventTrigger {
         self
+    }
+}
+
+impl IntoEventTrigger for LeaveAlone {
+    fn into_event_trigger(self) -> EventTrigger {
+        EventTrigger::new(|_| true)
     }
 }
 

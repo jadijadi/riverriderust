@@ -24,7 +24,6 @@ use crate::{
 use self::map::Map;
 
 mod drawings;
-pub mod events;
 pub mod map;
 
 #[derive(Clone, Copy)]
@@ -240,11 +239,10 @@ impl<'g> World<'g> {
 
         let signal_key = Uuid::new_v4();
         // Waiting for a signal that is triggered when latest popup goes off.
-        self.add_event(WorldBuilder::new(
-            WorldEventTrigger::Signal(signal_key.to_string()),
-            false,
-            after,
-        ));
+        self.add_event(
+            WorldBuilder::new(WorldEventTrigger::Signal(signal_key.to_string()))
+                .with_handler(after),
+        );
         advance(self, popups.into_iter().collect(), signal_key)
     }
 } // end of World implementation.
