@@ -1,8 +1,7 @@
 use events::setup_event_handlers;
 use log::LevelFilter;
+use riverraid::game::Game;
 use std::io::stdout;
-
-use riverraid::Game;
 
 mod events;
 

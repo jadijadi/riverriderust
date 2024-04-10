@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::world::{TimerKey, World};
+use crate::{timer::TimerKey, world::World};
 
 pub struct EventHandler<'g> {
     handler: Box<dyn Fn(&mut World) + 'g>,

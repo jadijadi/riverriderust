@@ -1,17 +1,100 @@
-use std::time::Duration;
+use std::{io, time::Duration};
 
-use crossterm::style::{ContentStyle, Stylize};
+use crossterm::{
+    event::{poll, read},
+    style::{ContentStyle, Stylize},
+};
 use rand::Rng;
 
 use riverraid::{
-    DeathCause, Enemy, Entity, EntityStatus, EntityType, Event, EventHandler, Fuel, Game,
-    IntoEventHandler, IntoEventTrigger, LeaveAlone, PlayerStatus, RiverMode, TimerEventHandler,
-    World, WorldEvent, WorldEventTrigger, WorldTimer,
+    entities::{Bullet, DeathCause, Enemy, Entity, EntityStatus, EntityType, Fuel, PlayerStatus},
+    events::{
+        handlers::{EventHandler, IntoEventHandler, LeaveAlone, TimerEventHandler},
+        setup::IntoEventSetup,
+        triggers::{IntoEventTrigger, WorldEventTrigger},
+        Event, WorldBuilder,
+    },
+    game::Game,
+    timer::Timer,
+    world::{map::RiverMode, World, WorldStatus},
 };
 
 fn is_the_chance(probability: f32) -> bool {
     let mut rng = rand::thread_rng();
     rng.gen::<f32>() < probability
+}
+
+fn keyboard_events(world: &mut World) -> io::Result<()> {
+    if poll(Duration::from_millis(10))? {
+        let key = read()?;
+
+        while poll(Duration::from_millis(0))? {
+            let _ = read();
+        }
+
+        match key {
+            crossterm::event::Event::Key(event) => {
+                // I'm reading from keyboard into event;
+                match event.code {
+                    // Movements
+                    crossterm::event::KeyCode::Char('w') | crossterm::event::KeyCode::Up
+                        if world.player.status == PlayerStatus::Alive
+                            && world.player.location.line > 1 =>
+                    {
+                        world.player.go_up();
+                    }
+                    crossterm::event::KeyCode::Char('s') | crossterm::event::KeyCode::Down
+                        if world.player.status == PlayerStatus::Alive
+                            && world.player.location.line < world.max_l() - 1 =>
+                    {
+                        world.player.go_down();
+                    }
+                    crossterm::event::KeyCode::Char('a') | crossterm::event::KeyCode::Left
+                        if world.player.status == PlayerStatus::Alive
+                            && world.player.location.column > 1 =>
+                    {
+                        world.player.go_left();
+                    }
+                    crossterm::event::KeyCode::Char('d') | crossterm::event::KeyCode::Right
+                        if world.player.status == PlayerStatus::Alive
+                            && world.player.location.column < world.max_c() - 1 =>
+                    {
+                        world.player.go_right();
+                    }
+
+                    // Other events
+                    crossterm::event::KeyCode::Char('q') => {
+                        world.player.status = PlayerStatus::Quit
+                    }
+                    crossterm::event::KeyCode::Char('p')
+                        if event.kind == crossterm::event::KeyEventKind::Press =>
+                    {
+                        use WorldStatus::*;
+                        world.status = match world.status {
+                            Fluent => Solid,
+                            Solid => Fluent,
+                        };
+                    }
+                    crossterm::event::KeyCode::Char(' ')
+                        if event.kind == crossterm::event::KeyEventKind::Press =>
+                    {
+                        if world.player.status == PlayerStatus::Alive
+                            && world.player.bullets.is_empty()
+                        {
+                            world
+                                .player
+                                .bullets
+                                .push(Bullet::new(&world.player.location, world.max_l() / 4));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(())
 }
 
 pub struct PlayerStatusUpdater;
@@ -141,36 +224,47 @@ fn create_random_entities(world: &mut World) {
 
 pub fn setup_event_handlers(game: &mut Game) {
     // ---- Permanent event, running on every loop (is_continues: true) ----
+
+    // Handle keyboard events.
+    game.setup_event(WorldBuilder::new(
+        WorldEventTrigger::Always,
+        true,
+        EventHandler::new(|world| {
+            // Ignore errors.
+            let _ = keyboard_events(world);
+        }),
+    ));
+
     // check if player hit the ground
-    game.add_event(PlayerStatusUpdater);
+    game.setup_event(PlayerStatusUpdater);
 
     // check enemy hit something
-    game.add_event(WorldEvent::new(
+    game.setup_event(WorldBuilder::new(
         WorldEventTrigger::Always,
         true,
         update_entities_status,
     ));
 
-    game.add_event(WorldEvent::new(
+    game.setup_event(WorldBuilder::new(
         WorldEventTrigger::Always,
         true,
         create_random_entities,
     ));
 
     // Move elements along map movements
-    game.add_event(WorldEvent::new(
+    game.setup_event(WorldBuilder::new(
         WorldEventTrigger::Always,
         true,
         move_entities,
     ));
 
-    game.add_event(WorldEvent::new(
+    game.setup_event(WorldBuilder::new(
         WorldEventTrigger::Always,
         true,
         move_bullets,
     ));
 
-    game.add_event(WorldEvent::new(
+    game.setup_event(WorldBuilder::new(
         WorldEventTrigger::Always,
         true,
         EventHandler::new(|world| {
@@ -180,7 +274,7 @@ pub fn setup_event_handlers(game: &mut Game) {
         }),
     ));
 
-    game.add_event(WorldEvent::new(
+    game.setup_event(WorldBuilder::new(
         WorldEventTrigger::Always,
         true,
         // Instead of using EventHandler::new(...)
@@ -193,7 +287,7 @@ pub fn setup_event_handlers(game: &mut Game) {
     // - This's an example: Every 60 sec move river to center
     //      then go back to normal and increase enemies spawn chance.
     game.add_timer(
-        WorldTimer::new(Duration::from_secs(60), true),
+        Timer::new(Duration::from_secs(60), true),
         TimerEventHandler::new(move |timer_key, world| {
             world.map.change_river_mode(RiverMode::ConstWidthAndCenter {
                 width: world.max_c() / 3,
@@ -208,7 +302,7 @@ pub fn setup_event_handlers(game: &mut Game) {
             );
 
             world.add_timer(
-                WorldTimer::new(Duration::from_secs(10), false),
+                Timer::new(Duration::from_secs(10), false),
                 // Instead of using TimerEventHandler::new(...)
                 move |world: &mut World| {
                     world.reset_timer(&timer_key);
@@ -237,18 +331,17 @@ pub fn setup_event_handlers(game: &mut Game) {
     // );
 
     // Update elapsed time every 1 sec
-    game.add_timer(
-        WorldTimer::new(Duration::from_secs(1), true),
+    game.setup_event(Timer::new(Duration::from_secs(1), true).into_event_setup(
         |world: &mut World| {
             world.elapsed_time += 1;
         },
-    );
+    ));
 
     // ---- Temporary events: Triggered on specified conditions (is_continues: false) ----
 
     // Opening events and popups
     let style = ContentStyle::new().green().on_magenta();
-    game.add_event(WorldEvent::new(
+    game.setup_event(WorldBuilder::new(
         WorldEventTrigger::GameStarted,
         false,
         move |world: &mut World| {
@@ -272,7 +365,7 @@ pub fn setup_event_handlers(game: &mut Game) {
                     world.enemy_spawn_probability.restore();
 
                     world.add_timer(
-                        WorldTimer::new(Duration::from_secs(10), true),
+                        Timer::new(Duration::from_secs(10), true),
                         |_, world: &mut World| {
                             world.player.score += 10;
                         },

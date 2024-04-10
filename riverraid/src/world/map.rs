@@ -2,13 +2,14 @@ use std::{cmp::Ordering, collections::VecDeque};
 
 use rand::{rngs::ThreadRng, Rng};
 
-use crate::utilities::{
-    event_handler::{EventHandler, IntoEventHandler},
-    restorable::Restorable,
-    stout_ext::AsLocationTuple,
+use crate::{
+    events::{
+        handlers::{EventHandler, IntoEventHandler},
+        triggers::{IntoEventTrigger, WorldEventTrigger},
+        Event,
+    },
+    utilities::{restorable::Restorable, stout_ext::AsLocationTuple},
 };
-
-use super::{Event, WorldEventTrigger};
 
 #[derive(Clone)]
 pub struct RiverPart {
@@ -220,7 +221,7 @@ impl<'g> Event<'g> for MapUpdater {
         true
     }
 
-    fn trigger(&self) -> impl super::IntoEventTrigger {
+    fn trigger(&self) -> impl IntoEventTrigger {
         WorldEventTrigger::Always
     }
 
