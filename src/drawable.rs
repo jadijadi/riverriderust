@@ -13,7 +13,7 @@ impl Drawable for Enemy {
     fn draw(&self, sc: &mut Canvas) {
         match self.status {
             EntityStatus::Alive => {
-                sc.draw_styled_char(self, '☠', ContentStyle::new().red().on_blue());
+                sc.draw_styled_char(self, '☠', ContentStyle::new().black().on_blue());
             }
             EntityStatus::DeadBody => {
                 sc.draw_styled(self, '☢'.red().on_blue());
@@ -40,7 +40,11 @@ impl Drawable for Fuel {
 impl Drawable for Bullet {
     fn draw(&self, sc: &mut Canvas) {
         sc.draw_styled_char(self, '⇈', ContentStyle::new().cyan().on_blue())
-            .draw_styled_char((self.location.c, self.location.l - 1), '↟', ContentStyle::new().cyan().on_blue());
+            .draw_styled_char(
+                (self.location.c, self.location.l - 1),
+                '↟',
+                ContentStyle::new().cyan().on_blue(),
+            );
     }
 }
 

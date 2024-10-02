@@ -1,4 +1,4 @@
-use crate::World;
+use crate::{entities::Bullet, World};
 
 use rand::Rng;
 use std::num::Wrapping;
@@ -164,6 +164,18 @@ impl World {
                 0,
                 EntityStatus::Alive,
             ));
+        }
+    }
+
+    pub fn create_bullet(&mut self) {
+        if self.bullets.len() < 3 {
+            let new_bullet = Bullet::new(
+                self.player.location.c,
+                self.player.location.l - 1,
+                self.maxl / 4,
+            );
+
+            self.bullets.push(new_bullet);
         }
     }
 

@@ -97,4 +97,51 @@ pub struct Player {
     pub status: PlayerStatus,
     pub gas: u16,
     pub score: u16,
+    pub maxl: u16,
+    pub maxc: u16,
+}
+
+impl Player {
+    fn get_loc(&self) -> Location {
+        Location {
+            c: self.location.c,
+            l: self.location.l,
+        }
+    }
+
+    fn set_loc(&mut self, c: u16, l: u16) {
+        self.location = Location { c, l };
+    }
+
+    pub fn move_down(&mut self) {
+        if self.location.l < self.maxl - 1 {
+            let mut loc = self.get_loc();
+            loc.l -= 1;
+            self.set_loc(loc.c, loc.l);
+        }
+    }
+
+    pub fn move_up(&mut self) {
+        if self.location.l > 1 {
+            let mut loc = self.get_loc();
+            loc.l += 1;
+            self.set_loc(loc.c, loc.l);
+        }
+    }
+
+    pub fn move_left(&mut self) {
+        if self.location.c > 1 {
+            let mut loc = self.get_loc();
+            loc.c -= 1;
+            self.set_loc(loc.c, loc.l);
+        }
+    }
+
+    pub fn move_right(&mut self) {
+        if self.location.c < self.maxc - 1 {
+            let mut loc = self.get_loc();
+            loc.c += 1;
+            self.set_loc(loc.c, loc.l);
+        }
+    }
 }

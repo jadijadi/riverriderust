@@ -41,6 +41,8 @@ impl World {
                 status: PlayerStatus::Alive,
                 score: 0,
                 gas: 1700,
+                maxc,
+                maxl,
             },
             map: VecDeque::from(vec![(maxc / 2 - 5, maxc / 2 + 5); maxl as usize]),
             maxc,
