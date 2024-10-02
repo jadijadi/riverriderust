@@ -43,7 +43,7 @@ pub fn handle_pressed_keys(world: &mut World) {
                     {
                         world.player.location.c += 1
                     }
-                    KeyCode::Char('q') => world.player.status = PlayerStatus::Quit,
+                    KeyCode::Char('q') | KeyCode::Esc => world.player.status = PlayerStatus::Quit,
                     KeyCode::Char('p') if event.kind == KeyEventKind::Press => {
                         use crate::WorldStatus::*;
                         world.status = match world.status {
