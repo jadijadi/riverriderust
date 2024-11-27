@@ -1,3 +1,5 @@
+workspace = { members = [".", "riverraid"] }
+
 [package]
 name = "riverriderust"
 version = "0.1.0"
@@ -6,5 +8,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-crossterm = "0.27.0"
+log = "0.4.21"
 rand = "0.8.5"
+crossterm = "0.27.0"
+simple-logging = "2.0.2"
+riverraid = { version = "0.1.0", path = "riverraid" }

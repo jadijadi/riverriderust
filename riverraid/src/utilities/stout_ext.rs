@@ -4,48 +4,22 @@ use std::{fmt::Display, io::Stdout};
 
 use crossterm::{cursor::MoveTo, style::Print, terminal::Clear, QueueableCommand};
 
-use crate::entities::{Bullet, Enemy, Fuel, Location, Player};
+use crate::entities::Location;
 
 pub type StdoutResult<'a> = Result<&'a mut Stdout, std::io::Error>;
 
+pub trait Located {
+    fn location(&self) -> &Location;
+}
+
+impl<T: Located> AsLocationTuple for T {
+    fn as_loc_tuple(&self) -> (u16, u16) {
+        (self.location().column, self.location().line)
+    }
+}
+
 pub trait AsLocationTuple {
     fn as_loc_tuple(&self) -> (u16, u16);
-}
-
-impl AsLocationTuple for Location {
-    fn as_loc_tuple(&self) -> (u16, u16) {
-        (self.c, self.l)
-    }
-}
-
-impl AsLocationTuple for &Enemy {
-    fn as_loc_tuple(&self) -> (u16, u16) {
-        self.location.as_loc_tuple()
-    }
-}
-
-impl AsLocationTuple for &Bullet {
-    fn as_loc_tuple(&self) -> (u16, u16) {
-        self.location.as_loc_tuple()
-    }
-}
-
-impl AsLocationTuple for &Fuel {
-    fn as_loc_tuple(&self) -> (u16, u16) {
-        self.location.as_loc_tuple()
-    }
-}
-
-impl AsLocationTuple for &Player {
-    fn as_loc_tuple(&self) -> (u16, u16) {
-        self.location.as_loc_tuple()
-    }
-}
-
-impl AsLocationTuple for &Location {
-    fn as_loc_tuple(&self) -> (u16, u16) {
-        (self.c, self.l)
-    }
 }
 
 impl AsLocationTuple for (u16, u16) {

@@ -5,7 +5,7 @@ use std::{
 
 use crossterm::style::{ContentStyle, StyledContent};
 
-use crate::{
+use crate::utilities::{
     drawable::Drawable,
     stout_ext::{AsLocationTuple, StdoutExt},
 };
@@ -56,7 +56,7 @@ impl Canvas {
     }
 
     pub fn draw(&mut self, drawable: &impl Drawable) -> &mut Canvas {
-        drawable.draw(self);
+        drawable.draw_on_canvas(self);
         self
     }
 
@@ -84,6 +84,7 @@ impl Canvas {
         self
     }
 
+    #[allow(dead_code)]
     pub fn draw_char(&mut self, loc: impl AsLocationTuple, display: char) -> &mut Canvas {
         self.draw_styled_char(loc, display, None)
     }
